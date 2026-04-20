@@ -1,6 +1,8 @@
-# NTHU CCXP Captcha API
+# ccxpDecaptcha
 
-Minimal Vercel-ready Python API for captcha inference.
+Minimal Vercel Python API for NTHU academic information system ([CCXP](https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/)) decaptcha.  
+The API is optimized for Vercel cold starts by using a low-dependency custom inference runtime (without PyTorch at runtime), with model weights trained by [25349023](https://github.com/25349023).  
+This project is forked from [25349023/nthu-ccxp-captcha](https://github.com/25349023/nthu-ccxp-captcha/) and remains licensed under MIT.
 
 ## Endpoint
 
@@ -21,16 +23,3 @@ Response body:
   "answer": "123456"
 }
 ```
-
-## Deploy To Vercel
-
-1. Install Vercel CLI.
-2. Run `vercel login`.
-3. Run `vercel`.
-4. Deploy with `vercel --prod`.
-
-## Runtime Files
-
-- `api/main.py`
-- `api/decaptcha.pt`
-- `requirements.txt`
