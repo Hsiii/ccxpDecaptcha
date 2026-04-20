@@ -34,3 +34,21 @@ This extension does not collect any personal data.
 - Download the captcha image
 - Transform to an Array of bytes
 - JSON.stringify the array and pass it to the API
+
+## Vercel Deployment
+
+This repository now serves inference from a Vercel Python function at `/api/decaptcha`.
+
+1. Install Vercel CLI.
+2. Run `vercel login`.
+3. Run `vercel` in this repository.
+4. Deploy to production with `vercel --prod`.
+
+After deployment, set `SERVER_URL` in both extension scripts to your own Vercel deployment URL:
+
+- `chrome_extension/content-script.js`
+- `firefox_addon/content-script.js`
+
+Current default endpoint is:
+
+- `https://nthu-ccxp-captcha.vercel.app/api/decaptcha`
