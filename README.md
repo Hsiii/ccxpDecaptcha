@@ -52,3 +52,12 @@ After deployment, set `SERVER_URL` in both extension scripts to your own Vercel 
 Current default endpoint is:
 
 - `https://nthu-ccxp-captcha.vercel.app/api/decaptcha`
+
+## Rate Limiting
+
+Use Vercel Firewall rate limiting for production traffic control instead of in-function memory state.
+
+- Open Vercel Project -> Settings -> Firewall.
+- Add a rate limit rule for path `/api/decaptcha`.
+- Set limit to `100` requests per `60` seconds.
+- Use key `ip_address` and action `deny` (HTTP 429).
