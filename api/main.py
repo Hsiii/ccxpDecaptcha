@@ -1,5 +1,4 @@
 import io
-import json
 import math
 import pickle
 import struct
@@ -299,11 +298,17 @@ def decaptcha():
     if request.method == "OPTIONS":
         return _cors_response("")
 
-    payload = request.get_json(silent=True) or {}
-    img = payload.get("img")
+    if request.mimetype == "application/json":
+        payload = request.get_json(silent=True) or {}
+        img = payload.get("img")
 
-    if not isinstance(img, list) or not img:
-        return _cors_response(jsonify({"error": "`img` must be a non-empty byte array."}), status=400)
+        if not isinstance(img, list) or not img:
+            return _cors_response(jsonify({"error": "`img` must be a non-empty byte array."}), status=400)
+    else:
+        img = request.get_data(cache=False)
+
+        if not img:
+            return _cors_response(jsonify({"error": "Request body must be non-empty image bytes."}), status=400)
 
     try:
         answer = predict_digits(img)

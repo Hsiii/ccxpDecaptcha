@@ -10,10 +10,10 @@ This project is forked from [25349023/nthu-ccxp-captcha](https://github.com/2534
 
 Request body:
 
-```json
-{
-  "img": [137, 80, 78, 71]
-}
+```http
+Content-Type: application/octet-stream
+
+<raw captcha image bytes>
 ```
 
 Response body:
