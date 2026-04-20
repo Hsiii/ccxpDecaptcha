@@ -74,7 +74,7 @@ def _rebuild_tensor_v2(storage, storage_offset, size, stride, requires_grad, bac
 
 @lru_cache(maxsize=1)
 def load_weights():
-    checkpoint_path = Path(__file__).resolve().parent.parent / "decaptcha" / "tiny_net.pt"
+    checkpoint_path = Path(__file__).resolve().parent / "decaptcha.pt"
 
     with zipfile.ZipFile(checkpoint_path, "r") as zf:
         storage_cache = {}

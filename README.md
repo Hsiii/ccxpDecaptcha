@@ -32,5 +32,5 @@ Response body:
 ## Runtime Files
 
 - `api/main.py`
-- `decaptcha/tiny_net.pt`
+- `api/decaptcha.pt`
 - `requirements.txt`
