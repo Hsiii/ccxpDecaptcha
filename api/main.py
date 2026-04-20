@@ -15,6 +15,7 @@ app = Flask(__name__)
 EPS = 1e-5
 DIGITS = 6
 MAX_VALID_WIDTH = 100
+ALLOWED_CORS_ORIGINS = {"https://www.ccxp.nthu.edu.tw"}
 
 
 class FloatStorage:  # marker class for pickle loading
@@ -280,14 +281,21 @@ def predict_digits(img_byte_values):
 
 def _cors_response(payload, status=200):
     response = make_response(payload, status)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    origin = request.headers.get("Origin")
+    if origin in ALLOWED_CORS_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
     return response
 
 
 @app.route("/api/decaptcha", methods=["POST", "OPTIONS"])
 def decaptcha():
+    origin = request.headers.get("Origin")
+    if origin and origin not in ALLOWED_CORS_ORIGINS:
+        return _cors_response(jsonify({"error": "Origin is not allowed."}), status=403)
+
     if request.method == "OPTIONS":
         return _cors_response("")
 
