@@ -1,5 +1,5 @@
 const CCXP_URL = "https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/";
-const SERVER_URL = "https://7s7izxcb32.execute-api.us-east-1.amazonaws.com/decaptcha";
+const SERVER_URL = "https://nthu-ccxp-captcha.vercel.app/api/decaptcha";
 
 function get_src(e) {
     let img = document.querySelector(".inputtext ~ img");

@@ -19,7 +19,7 @@
     "128": "/icons/ccxp_decaptcha@128.png"
   },
   "permissions": [
-    "*://7s7izxcb32.execute-api.us-east-1.amazonaws.com/*",
+    "*://*.vercel.app/*",
     "*://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/*"
   ]
 }
