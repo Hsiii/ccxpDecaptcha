@@ -1,7 +1,1 @@
-/.idea
-*raw_data/
-data/
-*.npy
-*.ipynb
-*.zip
-.vercel
+__pycache__/
