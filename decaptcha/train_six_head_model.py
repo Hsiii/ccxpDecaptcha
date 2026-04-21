@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 import random
+import warnings
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -319,9 +320,34 @@ def fit(model, train_ld, val_ld, loss_fn, optim, device: torch.device, scheduler
 
 
 def export_quantized_model(model: nn.Module, output_path: str):
-    quantized_model = torch.quantization.quantize_dynamic(model.cpu(), {nn.Linear}, dtype=torch.qint8)
-    scripted_model = torch.jit.script(quantized_model)
-    scripted_model.save(output_path)
+    supported_engines = [engine for engine in torch.backends.quantized.supported_engines if engine != 'none']
+    if not supported_engines:
+        warnings.warn(
+            'Skipping dynamic quantized export because no quantization backend is available on this system.',
+            RuntimeWarning,
+        )
+        return False
+
+    original_engine = torch.backends.quantized.engine
+    selected_engine = supported_engines[0]
+
+    try:
+        if original_engine != selected_engine:
+            torch.backends.quantized.engine = selected_engine
+
+        quantized_model = torch.quantization.quantize_dynamic(model.cpu(), {nn.Linear}, dtype=torch.qint8)
+        scripted_model = torch.jit.script(quantized_model)
+        scripted_model.save(output_path)
+        return True
+    except Exception as exc:
+        warnings.warn(
+            f'Skipping dynamic quantized export to {output_path}: {exc}',
+            RuntimeWarning,
+        )
+        return False
+    finally:
+        if original_engine in supported_engines and original_engine != selected_engine:
+            torch.backends.quantized.engine = original_engine
 
 
 def parse_args():
@@ -438,4 +464,5 @@ if __name__ == '__main__':
         'digits': DIGITS,
     }
     torch.save(checkpoint, 'decaptcha_best_val_seq.pt')
-    export_quantized_model(model, 'decaptcha.int8.pt')
+    if export_quantized_model(model, 'decaptcha.int8.pt'):
+        print('Saved quantized checkpoint to decaptcha.int8.pt')
