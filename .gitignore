@@ -1,8 +1,19 @@
-/.idea
-*raw_data/
+.idea/
+.venv/
+
+# Local datasets and raw captures
+raw_data/
 data/
 *.npy
-*.ipynb
 *.zip
+
+# Notebook scratch files
+*.ipynb
+
+# Python cache and local tooling noise
 __pycache__/
+*.py[cod]
+
+# Training artifacts
 *.pt
+*_failures.csv
