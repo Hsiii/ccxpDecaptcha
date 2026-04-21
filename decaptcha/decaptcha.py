@@ -1,14 +1,16 @@
 import io
-from typing import List
+from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import requests
 import torch
 from bs4 import BeautifulSoup
-from torch import nn
+from PIL import Image
+
+from decaptcha.model import SixHeadCaptchaNet, decode_predictions
 
 BASE_URL = 'https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/'
+MODEL_PATH = Path(__file__).with_name('decaptcha.pt')
 
 
 def get_img_src() -> str:
@@ -20,53 +22,34 @@ def get_img_src() -> str:
 
 def download_img(src: str) -> np.ndarray:
     res = requests.get(BASE_URL + src)
-    f = io.BytesIO(res.content)
-    img = plt.imread(f)
-    return img
+    with Image.open(io.BytesIO(res.content)) as image:
+        return np.asarray(image.convert('RGB'), dtype=np.uint8)
 
 
-def split(raw_img: np.ndarray, digits: int = 6) -> List[np.ndarray]:
-    max_valid_w = 100
-    raw_img = raw_img[:, :max_valid_w, :]
-    h, w, c = raw_img.shape
-    w_per_digit = w // digits
-    split_points = list(range(0, w, w_per_digit))
-
-    return [raw_img[:, split_points[i]:split_points[i + 1]]
-            for i in range(digits)]
+def preprocess(raw_img: np.ndarray) -> torch.Tensor:
+    tensor = torch.tensor(raw_img, dtype=torch.float32).permute(2, 0, 1) / 255.0
+    return tensor.unsqueeze(0)
 
 
-def load_tiny_net(ckpt_path: str):
-    tiny_net = nn.Sequential(
-        nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1),
-        nn.BatchNorm2d(16),
-        nn.ReLU(),
-        nn.Conv2d(16, 16, kernel_size=3, stride=2, padding=1),
-        nn.BatchNorm2d(16),
-        nn.ReLU(),
-        nn.AdaptiveAvgPool2d(2),
-        nn.Flatten(),
-        nn.Linear(64, 10)
-    )
+def load_model(ckpt_path: Path):
+    checkpoint = torch.load(ckpt_path, map_location='cpu')
+    state_dict = checkpoint['state_dict'] if isinstance(checkpoint, dict) and 'state_dict' in checkpoint else checkpoint
 
-    tiny_net.load_state_dict(torch.load(ckpt_path))
-    tiny_net.eval()
-    return tiny_net
+    model = SixHeadCaptchaNet()
+    model.load_state_dict(state_dict)
+    model.eval()
+    return model
 
 
-def decaptcha_one():
+def decaptcha_one(model_path: Path = MODEL_PATH):
     src = get_img_src()
     raw_img = download_img(src)
-    img_patches = split(raw_img[..., :3])
 
-    plt.imshow(raw_img)
-    plt.show()
-
-    tiny_net = load_tiny_net('tiny_net.pt')
-    for img in img_patches:
-        predict = tiny_net(torch.tensor(img[np.newaxis]).permute(0, 3, 1, 2))
-        print(predict.argmax(dim=1).item(), end='')
-    print()
+    model = load_model(model_path)
+    logits = model(preprocess(raw_img))
+    answer = decode_predictions(logits)[0]
+    print(answer)
+    return answer
 
 
 if __name__ == '__main__':

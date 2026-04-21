@@ -16,18 +16,21 @@ This extension does not collect any personal data.
 ### Data Collection
 
 - Download and manually label the images
+- Save repeated renders of the same `pwdstr` together so they can be grouped into the same split
 
 ### Data Preprocessing
 
-- Split the image into six patches of equal width
+- Keep the full captcha image at its native size
+- Build grouped train/validation splits by captcha identity instead of by digit crop
+- Apply live-site-matched augmentation during training
 
 ### Model
 
-- Conv2d Layer x 2
-- BatchNorm Layer after each Conv2d
-- ReLU as the activation function
-- Apply Adaptive Average Pooling to get 2x2 feature
-- Linear layer x 1
+- Lightweight CNN backbone over the full captcha image
+- Adaptive pooling to 6 positions
+- Six classification heads, one per digit
+- Exact 6-digit match rate as the primary validation metric
+- Export both the best float checkpoint and an `int8` inference artifact
 
 ### Extension
 
