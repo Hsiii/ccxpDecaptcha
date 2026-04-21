@@ -35,6 +35,15 @@ def parse_pwdstr(src: str) -> str:
     return matched.group(1)
 
 
+def count_solved_captchas(save_dir: Path) -> int:
+    solved = {
+        path.stem.split('__', maxsplit=1)[0]
+        for path in save_dir.glob('*.png')
+        if '__' in path.stem
+    }
+    return len(solved)
+
+
 def render_image_in_terminal(content: bytes):
     with Image.open(io.BytesIO(content)) as image:
         rgb_image = image.convert('RGB')
@@ -71,17 +80,18 @@ def show_image(content: bytes):
     render_image_in_terminal(content)
 
 
-def manually_label(src: str, session: requests.Session) -> Tuple[str, str]:
+def manually_label(src: str, session: requests.Session, solved_count: int) -> Tuple[str, str]:
     res = session.get(BASE_URL + src, timeout=20)
     res.raise_for_status()
     show_image(res.content)
-    label = input('solve the captcha: ').strip()
+    label = input(f'({solved_count} solved) solve the captcha: ').strip()
     return label, parse_pwdstr(src)
 
 
 def collect_one(save_dir: Path, generate_count: int, session: requests.Session):
     src = get_img_src(session)
-    file_prefix, pwdstr = manually_label(src, session)
+    solved_count = count_solved_captchas(save_dir)
+    file_prefix, pwdstr = manually_label(src, session, solved_count)
 
     for i in range(generate_count):
         res = session.get(BASE_URL + src, timeout=20)
