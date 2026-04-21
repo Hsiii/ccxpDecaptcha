@@ -2,7 +2,7 @@
 
 Local-only training pipeline for the NTHU CCXP captcha model.
 
-Based on the work by [25349023](https://github.com/25349023), this fork keeps only the local training workflow and replaces fixed-width per-digit slicing with a full-image six-head architecture.
+Based on the work by [25349023](https://github.com/25349023), this fork keeps only the local training workflow and replaces fixed-width per-digit slicing with a full-image six-head architecture. The model is then re-trained from scratch on a new dataset of 500+ manually labeled captcha renders collected in 2026, achieving a test set exact-sequence accuracy of 97.7%, and test set digit-level accuracy of 0.99.6%.
 
 ## Setup
 
@@ -22,7 +22,7 @@ python decaptcha/collect_data.py
 ```
 
 - Download captcha images from CCXP and label them manually.
-- Captchas are rendered inline in the terminal.
+- Captchas will be rendered inline in the terminal.
 - Repeated renders from the same `pwdstr` stay grouped in the saved filename.
 
 2. Build the dataset arrays:
@@ -40,14 +40,8 @@ This writes:
 If you mislabel a captcha batch, relabel the whole grouped filename set before rebuilding:
 
 ```bash
-python decaptcha/relabel_data.py 410892
+python decaptcha/relabel_data.py --latest
 ```
-
-- The command previews one render from the group in the terminal first.
-- With one positional argument, it relabels the latest submitted batch.
-- Use `--edit-latest 410892` if you want that behavior to be explicit.
-- Use `--dry-run` to inspect the rename plan without modifying files.
-- Use `--old-label` if the group already contains mixed labels.
 
 3. Train and evaluate:
 
@@ -73,10 +67,3 @@ Outputs:
 - `test_failures.csv`
 - `val_confusion_matrix.npy`
 - `test_confusion_matrix.npy`
-
-Reported metrics:
-
-- image-level exact-sequence accuracy
-- group-level majority-vote exact-sequence accuracy
-- per-digit accuracy
-- per-position accuracy
