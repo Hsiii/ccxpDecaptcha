@@ -2,6 +2,8 @@
 
 Local-only training pipeline for the NTHU CCXP six-head captcha model.
 
+Based on the original CCXP decaptcha work by the previous author, with this branch narrowing the repo to local training only and improving model performance by moving from fixed-width per-digit slicing to a full-image six-head architecture.
+
 ## Scope
 
 This repo only keeps:
