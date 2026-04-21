@@ -35,9 +35,39 @@ def parse_pwdstr(src: str) -> str:
     return matched.group(1)
 
 
-def show_image(content: bytes):
+def render_image_in_terminal(content: bytes):
     with Image.open(io.BytesIO(content)) as image:
-        image.convert('RGB').show()
+        rgb_image = image.convert('RGB')
+        width, height = rgb_image.size
+        scale = max(1, 180 // width)
+        resized = rgb_image.resize((width * scale, height * scale), Image.Resampling.NEAREST)
+        pixels = resized.load()
+
+        print()
+        for y in range(0, resized.height - 1, 2):
+            row = []
+            for x in range(resized.width):
+                top = pixels[x, y]
+                bottom = pixels[x, y + 1]
+                row.append(
+                    f'\x1b[38;2;{top[0]};{top[1]};{top[2]}m'
+                    f'\x1b[48;2;{bottom[0]};{bottom[1]};{bottom[2]}m▀'
+                )
+            row.append('\x1b[0m')
+            print(''.join(row))
+        if resized.height % 2 == 1:
+            row = []
+            y = resized.height - 1
+            for x in range(resized.width):
+                top = pixels[x, y]
+                row.append(f'\x1b[38;2;{top[0]};{top[1]};{top[2]}m▀')
+            row.append('\x1b[0m')
+            print(''.join(row))
+        print()
+
+
+def show_image(content: bytes):
+    render_image_in_terminal(content)
 
 
 def manually_label(src: str, session: requests.Session) -> Tuple[str, str]:
