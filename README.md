@@ -9,11 +9,12 @@ Based on the work by [25349023](https://github.com/25349023), this fork keeps on
 ### Data Collection
 
 ```bash
-pipenv install
 python decaptcha/collect_data.py
 ```
 
 - Download captcha images from CCXP and label them manually.
+- Render each captcha inline in the terminal instead of opening an external image window.
+- Save repeated renders with the same `pwdstr` in the filename so they stay in the same data group.
 
 ### Data Preprocessing
 

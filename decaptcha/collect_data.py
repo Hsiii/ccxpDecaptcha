@@ -43,6 +43,7 @@ def render_image_in_terminal(content: bytes):
         resized = rgb_image.resize((width * scale, height * scale), Image.Resampling.NEAREST)
         pixels = resized.load()
 
+        print('\x1b[2J\x1b[H', end='')
         print()
         for y in range(0, resized.height - 1, 2):
             row = []
@@ -74,7 +75,7 @@ def manually_label(src: str, session: requests.Session) -> Tuple[str, str]:
     res = session.get(BASE_URL + src, timeout=20)
     res.raise_for_status()
     show_image(res.content)
-    label = input('input the numbers you just saw: ').strip()
+    label = input('solve the captcha: ').strip()
     return label, parse_pwdstr(src)
 
 
