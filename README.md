@@ -40,7 +40,7 @@ This writes:
 3. Train and evaluate:
 
 ```bash
-python decaptcha/train_six_head_model.py
+python decaptcha/train_model.py
 ```
 
 Training behavior:

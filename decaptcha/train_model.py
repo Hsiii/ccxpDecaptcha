@@ -15,7 +15,7 @@ import tqdm
 from torch import nn
 from torch.utils import data
 
-from six_head_model import DIGITS, SixHeadCaptchaNet
+from model import DIGITS, SixHeadCaptchaNet
 
 
 SEED = 42
