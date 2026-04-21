@@ -1,7 +1,10 @@
+import csv
 import os
 import random
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -14,6 +17,7 @@ from six_head_model import DIGITS, SixHeadCaptchaNet
 
 
 SEED = 42
+MAX_TRAIN_RENDERS_PER_GROUP = 20
 
 
 def seed_everything(seed: int = SEED):
@@ -54,6 +58,8 @@ class CaptchaDataset(data.Dataset):
         if split_name not in split_indices:
             raise ValueError(f'Unknown split name: {split_name}')
         indices = split_indices[split_name]
+        if split_name == 'train':
+            indices = self._cap_group_samples(indices, groups, max_samples=MAX_TRAIN_RENDERS_PER_GROUP, seed=seed)
 
         self.images = images[indices]
         self.labels = labels[indices]
@@ -103,6 +109,24 @@ class CaptchaDataset(data.Dataset):
             test_indices=np.array(test_indices, dtype=np.int64),
         )
 
+    @staticmethod
+    def _cap_group_samples(indices: np.ndarray, groups: np.ndarray, max_samples: int, seed: int) -> np.ndarray:
+        grouped_indices = defaultdict(list)
+        for idx in indices.tolist():
+            grouped_indices[groups[idx]].append(idx)
+
+        rng = np.random.default_rng(seed)
+        selected = []
+        for group in sorted(grouped_indices):
+            group_indices = grouped_indices[group]
+            if len(group_indices) > max_samples:
+                chosen = rng.choice(group_indices, size=max_samples, replace=False).tolist()
+                selected.extend(sorted(chosen))
+            else:
+                selected.extend(group_indices)
+
+        return np.array(selected, dtype=np.int64)
+
     def __getitem__(self, item):
         image = self.images[item]
         label = torch.tensor(self.labels[item], dtype=torch.long)
@@ -141,6 +165,12 @@ def compute_metrics(logits: torch.Tensor, labels: torch.Tensor) -> Dict[str, flo
     }
 
 
+def build_train_sampler(dataset: CaptchaDataset) -> data.WeightedRandomSampler:
+    group_counts = Counter(dataset.groups.tolist())
+    weights = torch.tensor([1.0 / group_counts[group] for group in dataset.groups.tolist()], dtype=torch.double)
+    return data.WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+
+
 def train_one_epoch(model, dataset, loss_fn, optim, device: torch.device):
     losses = []
     metric_history = []
@@ -158,9 +188,69 @@ def train_one_epoch(model, dataset, loss_fn, optim, device: torch.device):
     return float(np.mean(losses)), average_metrics(metric_history)
 
 
+def collect_prediction_rows(logits: torch.Tensor, labels: torch.Tensor, groups: np.ndarray) -> List[Dict[str, object]]:
+    predictions = logits.argmax(dim=-1).detach().cpu().numpy()
+    labels_np = labels.detach().cpu().numpy()
+    rows = []
+    for predicted_digits, label_digits, group in zip(predictions, labels_np, groups.tolist()):
+        rows.append({
+            'group': str(group),
+            'truth': ''.join(str(int(digit)) for digit in label_digits),
+            'prediction': ''.join(str(int(digit)) for digit in predicted_digits),
+            'per_position_correct': [int(pred == truth) for pred, truth in zip(predicted_digits, label_digits)],
+        })
+    return rows
+
+
+def summarize_prediction_rows(rows: List[Dict[str, object]]) -> Dict[str, object]:
+    total_images = len(rows)
+    image_exact = sum(1 for row in rows if row['prediction'] == row['truth']) / total_images
+
+    position_correct = [0] * DIGITS
+    confusion = np.zeros((DIGITS, 10, 10), dtype=np.int64)
+    grouped_rows = defaultdict(list)
+    for row in rows:
+        grouped_rows[row['group']].append(row)
+        truth = row['truth']
+        prediction = row['prediction']
+        for idx, (truth_digit, predicted_digit) in enumerate(zip(truth, prediction)):
+            if truth_digit == predicted_digit:
+                position_correct[idx] += 1
+            confusion[idx, int(truth_digit), int(predicted_digit)] += 1
+
+    group_exact_matches = 0
+    for group_rows in grouped_rows.values():
+        truth = group_rows[0]['truth']
+        majority_prediction = Counter(row['prediction'] for row in group_rows).most_common(1)[0][0]
+        if majority_prediction == truth:
+            group_exact_matches += 1
+
+    return {
+        'image_sequence_accuracy': image_exact,
+        'group_sequence_accuracy': group_exact_matches / len(grouped_rows),
+        'position_accuracy': [correct / total_images for correct in position_correct],
+        'confusion_matrix': confusion,
+    }
+
+
+def export_failure_rows(rows: List[Dict[str, object]], output_path: Path):
+    failures = [row for row in rows if row['prediction'] != row['truth']]
+    with output_path.open('w', newline='') as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=['group', 'truth', 'prediction'])
+        writer.writeheader()
+        for row in failures:
+            writer.writerow({
+                'group': row['group'],
+                'truth': row['truth'],
+                'prediction': row['prediction'],
+            })
+
+
 def test_one_epoch(model, dataset, loss_fn, device: torch.device):
     losses = []
     metric_history = []
+    prediction_rows = []
+    offset = 0
     with torch.no_grad():
         for x, y in tqdm.tqdm(dataset, desc='Testing... ', leave=False):
             x, y = x.to(device), y.to(device)
@@ -168,8 +258,11 @@ def test_one_epoch(model, dataset, loss_fn, device: torch.device):
             loss = multi_head_loss(logits, y, loss_fn)
             losses.append(loss.item())
             metric_history.append(compute_metrics(logits, y))
+            batch_groups = dataset.dataset.groups[offset:offset + x.shape[0]]
+            prediction_rows.extend(collect_prediction_rows(logits, y, batch_groups))
+            offset += x.shape[0]
 
-    return float(np.mean(losses)), average_metrics(metric_history)
+    return float(np.mean(losses)), average_metrics(metric_history), summarize_prediction_rows(prediction_rows), prediction_rows
 
 
 def average_metrics(metric_history):
@@ -192,7 +285,7 @@ def fit(model, train_ld, val_ld, loss_fn, optim, device: torch.device, scheduler
         model.train()
         train_loss, train_metrics = train_one_epoch(model, train_ld, loss_fn, optim, device)
         model.eval()
-        val_loss, val_metrics = test_one_epoch(model, val_ld, loss_fn, device)
+        val_loss, val_metrics, val_summary, _ = test_one_epoch(model, val_ld, loss_fn, device)
 
         print(
             f'Epoch {epoch:>2}: '
@@ -200,7 +293,8 @@ def fit(model, train_ld, val_ld, loss_fn, optim, device: torch.device, scheduler
             f'val_loss = {val_loss:.6f}, '
             f'train_seq_acc = {train_metrics["sequence_accuracy"]:.6f}, '
             f'val_seq_acc = {val_metrics["sequence_accuracy"]:.6f}, '
-            f'val_digit_acc = {val_metrics["digit_accuracy"]:.6f}'
+            f'val_digit_acc = {val_metrics["digit_accuracy"]:.6f}, '
+            f'val_group_seq_acc = {val_summary["group_sequence_accuracy"]:.6f}'
         )
 
         if val_metrics['sequence_accuracy'] > best_sequence_accuracy:
@@ -232,7 +326,12 @@ if __name__ == '__main__':
     describe_split('val', val_dataset)
     describe_split('test', test_dataset)
 
-    train_loader = data.DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=0)
+    train_loader = data.DataLoader(
+        train_dataset,
+        batch_size=128,
+        sampler=build_train_sampler(train_dataset),
+        num_workers=0,
+    )
     val_loader = data.DataLoader(val_dataset, batch_size=256, shuffle=False, num_workers=0)
     test_loader = data.DataLoader(test_dataset, batch_size=256, shuffle=False, num_workers=0)
 
@@ -264,18 +363,42 @@ if __name__ == '__main__':
     torch.save(last_checkpoint, 'decaptcha_last.pt')
 
     model.load_state_dict(best_state)
-    test_loss, test_metrics = test_one_epoch(model, test_loader, loss, device)
+    val_loss, val_metrics, val_summary, val_rows = test_one_epoch(model, val_loader, loss, device)
+    test_loss, test_metrics, test_summary, test_rows = test_one_epoch(model, test_loader, loss, device)
+    print(
+        f'Best checkpoint validation metrics: '
+        f'val_loss = {val_loss:.6f}, '
+        f'val_seq_acc = {val_metrics["sequence_accuracy"]:.6f}, '
+        f'val_group_seq_acc = {val_summary["group_sequence_accuracy"]:.6f}, '
+        f'val_digit_acc = {val_metrics["digit_accuracy"]:.6f}'
+    )
     print(
         f'Best checkpoint test metrics: '
         f'test_loss = {test_loss:.6f}, '
         f'test_seq_acc = {test_metrics["sequence_accuracy"]:.6f}, '
+        f'test_group_seq_acc = {test_summary["group_sequence_accuracy"]:.6f}, '
         f'test_digit_acc = {test_metrics["digit_accuracy"]:.6f}'
     )
+
+    np.save('val_confusion_matrix.npy', val_summary['confusion_matrix'])
+    np.save('test_confusion_matrix.npy', test_summary['confusion_matrix'])
+    export_failure_rows(val_rows, Path('val_failures.csv'))
+    export_failure_rows(test_rows, Path('test_failures.csv'))
+    print(f'val_position_acc = {val_summary["position_accuracy"]}')
+    print(f'test_position_acc = {test_summary["position_accuracy"]}')
 
     checkpoint = {
         'state_dict': best_state,
         'sequence_accuracy': best_sequence_accuracy,
         'test_metrics': test_metrics,
+        'val_summary': {
+            'group_sequence_accuracy': val_summary['group_sequence_accuracy'],
+            'position_accuracy': val_summary['position_accuracy'],
+        },
+        'test_summary': {
+            'group_sequence_accuracy': test_summary['group_sequence_accuracy'],
+            'position_accuracy': test_summary['position_accuracy'],
+        },
         'digits': DIGITS,
     }
     torch.save(checkpoint, 'decaptcha_best_val_seq.pt')
