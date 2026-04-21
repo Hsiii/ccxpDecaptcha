@@ -22,7 +22,7 @@ pipenv install
 1. Collect labeled captcha images into `raw_data/`:
 
 ```bash
-python decaptcha/collect_data.py
+python decaptcha/collect_labeled_captchas.py
 ```
 
 Each saved filename keeps the source `pwdstr` so repeated renders from the same captcha stay grouped together.
@@ -30,7 +30,7 @@ Each saved filename keeps the source `pwdstr` so repeated renders from the same 
 2. Build the training arrays:
 
 ```bash
-python decaptcha/image_splitting.py
+python decaptcha/build_dataset.py
 ```
 
 This writes:
@@ -42,7 +42,7 @@ This writes:
 3. Train the six-head model:
 
 ```bash
-python decaptcha/training.py
+python decaptcha/train_six_head_model.py
 ```
 
 This writes:
