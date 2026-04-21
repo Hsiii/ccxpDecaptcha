@@ -64,7 +64,8 @@ def collect_latest_group(raw_dir: Path) -> str:
     paths = sorted(raw_dir.glob('*__*.png'))
     if not paths:
         raise FileNotFoundError(f'No labeled files found in {raw_dir}')
-    latest_group, _, _ = parse_group_file(paths[-1])
+    latest_path = max(paths, key=lambda path: (path.stat().st_mtime_ns, path.name))
+    latest_group, _, _ = parse_group_file(latest_path)
     return latest_group
 
 
@@ -121,8 +122,10 @@ def main():
     parser.add_argument('--raw-dir', default='raw_data', help='Directory containing the collected PNG files.')
     parser.add_argument(
         '--latest',
+        '--edit-latest',
+        dest='latest',
         action='store_true',
-        help='Relabel the most recently saved captcha group.',
+        help='Relabel the most recently submitted captcha group.',
     )
     parser.add_argument(
         '--old-label',

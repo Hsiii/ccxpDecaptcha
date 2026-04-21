@@ -44,8 +44,8 @@ python decaptcha/relabel_data.py 410892
 ```
 
 - The command previews one render from the group in the terminal first.
-- With one positional argument, it relabels the latest saved batch.
-- Use `--latest 410892` if you want that behavior to be explicit.
+- With one positional argument, it relabels the latest submitted batch.
+- Use `--edit-latest 410892` if you want that behavior to be explicit.
 - Use `--dry-run` to inspect the rename plan without modifying files.
 - Use `--old-label` if the group already contains mixed labels.
 
