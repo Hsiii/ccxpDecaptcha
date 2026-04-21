@@ -1,3 +1,4 @@
+import argparse
 import csv
 import os
 import random
@@ -323,7 +324,26 @@ def export_quantized_model(model: nn.Module, output_path: str):
     scripted_model.save(output_path)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--resume', default='decaptcha_last.pt')
+    parser.add_argument('--epochs', type=int, default=30)
+    return parser.parse_args()
+
+
+def maybe_resume(model: nn.Module, checkpoint_path: str):
+    if not checkpoint_path or not os.path.exists(checkpoint_path):
+        print(f'No resume checkpoint found at {checkpoint_path}; starting from scratch.')
+        return
+
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    state_dict = checkpoint['state_dict'] if isinstance(checkpoint, dict) and 'state_dict' in checkpoint else checkpoint
+    model.load_state_dict(state_dict)
+    print(f'Resumed weights from {checkpoint_path}.')
+
+
 if __name__ == '__main__':
+    args = parse_args()
     seed_everything()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -346,6 +366,7 @@ if __name__ == '__main__':
     test_loader = data.DataLoader(test_dataset, batch_size=256, shuffle=False, num_workers=0)
 
     model = SixHeadCaptchaNet().to(device)
+    maybe_resume(model, args.resume)
 
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-4)
@@ -355,7 +376,7 @@ if __name__ == '__main__':
         factor=0.5,
         patience=LR_PLATEAU_PATIENCE,
     )
-    epochs = 60
+    epochs = args.epochs
 
     best_state, best_sequence_accuracy = fit(
         model,
