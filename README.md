@@ -1,64 +1,45 @@
 # CCXP Captcha Training
 
-Local-only training pipeline for the NTHU CCXP six-head captcha model.
+Local-only training pipeline for a NTHU CCXP decaptcha model.
 
-Based on the original CCXP decaptcha work by the previous author, with this branch narrowing the repo to local training only and improving model performance by moving from fixed-width per-digit slicing to a full-image six-head architecture.
+Based on the work by [25349023](https://github.com/25349023), this fork keeps only the local training pipeline and improves the model by replacing fixed-width per-digit slicing with a full-image six-head architecture.
 
-## Scope
+## Current Pipeline
 
-This repo only keeps:
-
-- captcha download and manual labeling
-- dataset generation for full-image grouped samples
-- six-head model definition
-- local training and export
-
-## Setup
+### Data Collection
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+pipenv install
+python decaptcha/collect_data.py
 ```
 
-## Workflow
+- Download captcha images from CCXP and label them manually.
+- Save repeated renders with the same `pwdstr` in the filename so they stay in the same data group.
 
-1. Collect labeled captcha images into `raw_data/`:
+### Data Preprocessing
 
 ```bash
-python decaptcha/collect_labeled_captchas.py
+python decaptcha/image_splitting.py
 ```
 
-Each saved filename keeps the source `pwdstr` so repeated renders from the same captcha stay grouped together.
+- Load each captcha as one full RGB image.
+- Build `captcha_images.npy`, `captcha_labels.npy`, and `captcha_groups.npy`.
+- Split train and validation by captcha group instead of by individual digit crop.
+- Apply training augmentation with affine transform, color jitter, blur, and random erasing.
 
-2. Build the training arrays:
+### Model Structure
 
 ```bash
-python decaptcha/build_dataset.py
+python decaptcha/training.py
 ```
 
-This writes:
-
-- `captcha_images.npy`
-- `captcha_labels.npy`
-- `captcha_groups.npy`
-
-3. Train the six-head model:
-
-```bash
-python decaptcha/train_six_head_model.py
-```
-
-This writes:
-
-- `decaptcha.pt`
-- `decaptcha.int8.pt`
-
-## Model Notes
-
-- Input is the full captcha image at native size.
-- The backbone is a lightweight CNN.
-- Adaptive pooling produces six positions.
-- Each position has an independent digit head.
-- Validation is tracked with exact-sequence accuracy and per-digit accuracy.
+- Input: full captcha image at native size.
+- Backbone:
+  `Conv2d(3->24, stride=2) -> BatchNorm2d -> ReLU`
+  `DepthwiseConv2d -> BatchNorm2d -> ReLU -> PointwiseConv2d -> BatchNorm2d -> ReLU`
+  `DepthwiseConv2d(stride=2) -> BatchNorm2d -> ReLU -> PointwiseConv2d -> BatchNorm2d -> ReLU`
+  `DepthwiseConv2d -> BatchNorm2d -> ReLU -> PointwiseConv2d -> BatchNorm2d -> ReLU`
+- Head:
+  `AdaptiveAvgPool2d((1, 6)) -> six independent Linear(...->10) heads`
+- Output: 6 digit logits, one head per position.
+- Validation metrics: exact-sequence accuracy and per-digit accuracy.
