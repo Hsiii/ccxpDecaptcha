@@ -18,13 +18,17 @@ from torch.utils import data
 from model import DIGITS, SixHeadCaptchaNet
 
 
-SEED = 42
+import time
+SEED = None  # Default: random split
 MAX_TRAIN_RENDERS_PER_GROUP = 20
 EARLY_STOPPING_PATIENCE = 8
 LR_PLATEAU_PATIENCE = 3
 
 
 def seed_everything(seed: int = SEED):
+    if seed is None:
+        # Use current time for randomness
+        seed = int(time.time() * 1000) % (2**32 - 1)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -53,7 +57,9 @@ class CaptchaDataset(data.Dataset):
         labels = np.load(os.path.join(path_to_data_root, 'captcha_labels.npy'))
         groups = np.load(os.path.join(path_to_data_root, 'captcha_groups.npy'))
 
-        split = self._build_split(groups, train_ratio=train_ratio, val_ratio=val_ratio, seed=seed)
+        # If seed is None, use a random seed for each run
+        actual_seed = seed if seed is not None else int(time.time() * 1000) % (2**32 - 1)
+        split = self._build_split(groups, train_ratio=train_ratio, val_ratio=val_ratio, seed=actual_seed)
         split_indices = {
             'train': split.train_indices,
             'val': split.val_indices,
@@ -63,7 +69,7 @@ class CaptchaDataset(data.Dataset):
             raise ValueError(f'Unknown split name: {split_name}')
         indices = split_indices[split_name]
         if split_name == 'train':
-            indices = self._cap_group_samples(indices, groups, max_samples=MAX_TRAIN_RENDERS_PER_GROUP, seed=seed)
+            indices = self._cap_group_samples(indices, groups, max_samples=MAX_TRAIN_RENDERS_PER_GROUP, seed=actual_seed)
 
         self.images = images[indices]
         self.labels = labels[indices]
