@@ -18,6 +18,8 @@ from six_head_model import DIGITS, SixHeadCaptchaNet
 
 SEED = 42
 MAX_TRAIN_RENDERS_PER_GROUP = 20
+EARLY_STOPPING_PATIENCE = 8
+LR_PLATEAU_PATIENCE = 3
 
 
 def seed_everything(seed: int = SEED):
@@ -280,6 +282,7 @@ def describe_split(name: str, dataset: CaptchaDataset):
 def fit(model, train_ld, val_ld, loss_fn, optim, device: torch.device, scheduler=None, epochs=20):
     best_state = None
     best_sequence_accuracy = -1.0
+    epochs_without_improvement = 0
 
     for epoch in range(epochs):
         model.train()
@@ -300,9 +303,16 @@ def fit(model, train_ld, val_ld, loss_fn, optim, device: torch.device, scheduler
         if val_metrics['sequence_accuracy'] > best_sequence_accuracy:
             best_sequence_accuracy = val_metrics['sequence_accuracy']
             best_state = {name: value.detach().cpu().clone() for name, value in model.state_dict().items()}
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
 
         if scheduler is not None:
-            scheduler.step()
+            scheduler.step(val_loss)
+
+        if epochs_without_improvement >= EARLY_STOPPING_PATIENCE:
+            print(f'Early stopping at epoch {epoch:>2} after {epochs_without_improvement} stale validation epochs.')
+            break
 
     return best_state, best_sequence_accuracy
 
@@ -339,7 +349,12 @@ if __name__ == '__main__':
 
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode='min',
+        factor=0.5,
+        patience=LR_PLATEAU_PATIENCE,
+    )
     epochs = 60
 
     best_state, best_sequence_accuracy = fit(

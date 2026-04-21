@@ -1,45 +1,70 @@
 # ccxpDecaptcha
 
-Local-only training pipeline for a NTHU CCXP decaptcha model.
+Local-only training pipeline for the NTHU CCXP captcha model.
 
-Based on the work by [25349023](https://github.com/25349023), this fork keeps only the local training pipeline and improves the model by replacing fixed-width per-digit slicing with a full-image six-head architecture.
+Based on the work by [25349023](https://github.com/25349023), this fork keeps only the local training workflow and replaces fixed-width per-digit slicing with a full-image six-head architecture.
 
-## Current Pipeline
+## Setup
 
-### Data Collection
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+## Workflow
+
+1. Collect labeled captchas:
 
 ```bash
 python decaptcha/collect_data.py
 ```
 
 - Download captcha images from CCXP and label them manually.
-- Render each captcha inline in the terminal instead of opening an external image window.
-- Save repeated renders with the same `pwdstr` in the filename so they stay in the same data group.
+- Captchas are rendered inline in the terminal.
+- Repeated renders from the same `pwdstr` stay grouped in the saved filename.
 
-### Data Preprocessing
-
-```bash
-python decaptcha/image_splitting.py
-```
-
-- Load each captcha as one full RGB image.
-- Build `captcha_images.npy`, `captcha_labels.npy`, and `captcha_groups.npy`.
-- Split train and validation by captcha group instead of by individual digit crop.
-- Apply training augmentation with affine transform, color jitter, blur, and random erasing.
-
-### Model Structure
+2. Build the dataset arrays:
 
 ```bash
-python decaptcha/training.py
+python decaptcha/build_dataset.py
 ```
 
-- Input: full captcha image at native size.
-- Backbone:
-  `Conv2d(3->24, stride=2) -> BatchNorm2d -> ReLU`
-  `DepthwiseConv2d -> BatchNorm2d -> ReLU -> PointwiseConv2d -> BatchNorm2d -> ReLU`
-  `DepthwiseConv2d(stride=2) -> BatchNorm2d -> ReLU -> PointwiseConv2d -> BatchNorm2d -> ReLU`
-  `DepthwiseConv2d -> BatchNorm2d -> ReLU -> PointwiseConv2d -> BatchNorm2d -> ReLU`
-- Head:
-  `AdaptiveAvgPool2d((1, 6)) -> six independent Linear(...->10) heads`
-- Output: 6 digit logits, one head per position.
-- Validation metrics: exact-sequence accuracy and per-digit accuracy.
+This writes:
+
+- `captcha_images.npy`
+- `captcha_labels.npy`
+- `captcha_groups.npy`
+
+3. Train and evaluate:
+
+```bash
+python decaptcha/train_six_head_model.py
+```
+
+Training behavior:
+
+- grouped `train/val/test` split by captcha `pwdstr`
+- train split capped to `20` renders per captcha group
+- group-balanced weighted sampling during training
+- `ReduceLROnPlateau` scheduler on validation loss
+- early stopping after `8` stale validation epochs
+- best checkpoint selected by validation exact-sequence accuracy
+
+Outputs:
+
+- `decaptcha_best_val_seq.pt`
+- `decaptcha_last.pt`
+- `decaptcha.int8.pt`
+- `val_failures.csv`
+- `test_failures.csv`
+- `val_confusion_matrix.npy`
+- `test_confusion_matrix.npy`
+
+Reported metrics:
+
+- image-level exact-sequence accuracy
+- group-level majority-vote exact-sequence accuracy
+- per-digit accuracy
+- per-position accuracy
