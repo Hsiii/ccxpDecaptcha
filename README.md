@@ -1,4 +1,4 @@
-# CCXP Captcha Training
+# ccxpDecaptcha
 
 Local-only training pipeline for a NTHU CCXP decaptcha model.
 
@@ -14,7 +14,6 @@ python decaptcha/collect_data.py
 ```
 
 - Download captcha images from CCXP and label them manually.
-- Save repeated renders with the same `pwdstr` in the filename so they stay in the same data group.
 
 ### Data Preprocessing
 
