@@ -4,3 +4,5 @@ data/
 *.npy
 *.ipynb
 *.zip
+__pycache__/
+*.pt

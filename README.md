@@ -1,39 +1,59 @@
-# NTHU CCXP Decaptcha
+# CCXP Captcha Training
 
-Automatically fill in the captcha on the NTHU Academic Information Systems.
+Local-only training pipeline for the NTHU CCXP six-head captcha model.
 
-## Download & Installation
+## Scope
 
-- [Firefox Add-on](https://addons.mozilla.org/zh-TW/firefox/addon/nthu-ccxp-decaptcha/)
-- [Chrome Extension](https://chrome.google.com/webstore/detail/nthu-ccxp-decaptcha/hpbhebpkmhpeoomcmdmlmhlclhbbdjho?hl=zh-TW)
+This repo only keeps:
 
-## Privacy Policy
+- captcha download and manual labeling
+- dataset generation for full-image grouped samples
+- six-head model definition
+- local training and export
 
-This extension does not collect any personal data.
+## Setup
 
-## Implementation Details
+```bash
+pipenv install
+```
 
-### Data Collection
+## Workflow
 
-- Download and manually label the images
-- Save repeated renders of the same `pwdstr` together so they can be grouped into the same split
+1. Collect labeled captcha images into `raw_data/`:
 
-### Data Preprocessing
+```bash
+python decaptcha/collect_data.py
+```
 
-- Keep the full captcha image at its native size
-- Build grouped train/validation splits by captcha identity instead of by digit crop
-- Apply live-site-matched augmentation during training
+Each saved filename keeps the source `pwdstr` so repeated renders from the same captcha stay grouped together.
 
-### Model
+2. Build the training arrays:
 
-- Lightweight CNN backbone over the full captcha image
-- Adaptive pooling to 6 positions
-- Six classification heads, one per digit
-- Exact 6-digit match rate as the primary validation metric
-- Export both the best float checkpoint and an `int8` inference artifact
+```bash
+python decaptcha/image_splitting.py
+```
 
-### Extension
+This writes:
 
-- Download the captcha image
-- Transform to an Array of bytes
-- JSON.stringify the array and pass it to the API
+- `captcha_images.npy`
+- `captcha_labels.npy`
+- `captcha_groups.npy`
+
+3. Train the six-head model:
+
+```bash
+python decaptcha/training.py
+```
+
+This writes:
+
+- `decaptcha.pt`
+- `decaptcha.int8.pt`
+
+## Model Notes
+
+- Input is the full captcha image at native size.
+- The backbone is a lightweight CNN.
+- Adaptive pooling produces six positions.
+- Each position has an independent digit head.
+- Validation is tracked with exact-sequence accuracy and per-digit accuracy.
