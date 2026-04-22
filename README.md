@@ -2,7 +2,7 @@
 
 A training pipeline for NTHU CCXP decaptcha model.
 
-Based on the work by [25349023](https://github.com/25349023), this fork enhances the local training workflow and the model architecture with a new cropped full-image six-head model. The model is retrained from scratch on a new dataset of 600 manually labeled captcha renders collected in 2026 April, achieving significantly improved performance of 99.7% six-digit sequence accuracy and 99.9% individual digit accuracy.
+Based on the work by [25349023](https://github.com/25349023), this fork enhances the local training workflow and the model architecture with a new cropped full-image six-head model. The model is retrained from scratch on a new dataset of 600 manually labeled captcha renders collected in 2026 April, achieving significantly improved performance of 99.96% six-digit sequence accuracy and 99.99% individual digit accuracy.
 
 ## Setup
 
