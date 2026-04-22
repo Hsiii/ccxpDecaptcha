@@ -387,6 +387,47 @@ def maybe_resume(model: nn.Module, checkpoint_path: str):
     print(f'Resumed weights from {checkpoint_path}.')
 
 
+def load_existing_checkpoint(checkpoint_path: Path) -> Optional[Dict[str, object]]:
+    if not checkpoint_path.exists():
+        return None
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    if not isinstance(checkpoint, dict):
+        return None
+    return checkpoint
+
+
+def extract_checkpoint_sequence_metrics(checkpoint: Optional[Dict[str, object]]) -> Tuple[Optional[float], Optional[float]]:
+    if checkpoint is None:
+        return None, None
+
+    val_sequence_accuracy = checkpoint.get('sequence_accuracy')
+    test_metrics = checkpoint.get('test_metrics')
+    test_sequence_accuracy = None
+    if isinstance(test_metrics, dict):
+        test_sequence_accuracy = test_metrics.get('sequence_accuracy')
+
+    return val_sequence_accuracy, test_sequence_accuracy
+
+
+def should_replace_best_checkpoint(
+    previous_checkpoint: Optional[Dict[str, object]],
+    new_val_sequence_accuracy: float,
+    new_test_sequence_accuracy: float,
+) -> bool:
+    previous_val_sequence_accuracy, previous_test_sequence_accuracy = extract_checkpoint_sequence_metrics(previous_checkpoint)
+    if previous_val_sequence_accuracy is None or previous_test_sequence_accuracy is None:
+        return True
+
+    return (
+        new_val_sequence_accuracy >= previous_val_sequence_accuracy
+        and new_test_sequence_accuracy >= previous_test_sequence_accuracy
+        and (
+            new_val_sequence_accuracy > previous_val_sequence_accuracy
+            or new_test_sequence_accuracy > previous_test_sequence_accuracy
+        )
+    )
+
+
 def build_output_paths(output_dir: Path) -> Dict[str, Path]:
     return {
         'last_checkpoint': output_dir / 'last.pt',
@@ -449,10 +490,15 @@ if __name__ == '__main__':
     maybe_resume(model, args.resume)
 
     output_dir = Path(args.out)
+    existing_best_checkpoint = load_existing_checkpoint(build_output_paths(output_dir)['best_checkpoint'])
     output_paths = prepare_output_dir(
         output_dir,
         overwrite_output=args.overwrite,
-        preserve_paths=[Path(args.resume)],
+        preserve_paths=[
+            Path(args.resume),
+            build_output_paths(output_dir)['best_checkpoint'],
+            build_output_paths(output_dir)['quantized_checkpoint'],
+        ],
     )
 
     loss = nn.CrossEntropyLoss()
@@ -512,6 +558,7 @@ if __name__ == '__main__':
     checkpoint = {
         'state_dict': best_state,
         'sequence_accuracy': best_sequence_accuracy,
+        'val_metrics': val_metrics,
         'test_metrics': test_metrics,
         'val_summary': {
             'group_sequence_accuracy': val_summary['group_sequence_accuracy'],
@@ -525,9 +572,26 @@ if __name__ == '__main__':
         'seed': args.seed,
         'data_dir': args.data,
     }
-    torch.save(checkpoint, output_paths['best_checkpoint'])
-    if export_quantized_model(model, str(output_paths['quantized_checkpoint'])):
-        print(f'Saved quantized checkpoint to {output_paths["quantized_checkpoint"]}')
+    if should_replace_best_checkpoint(
+        existing_best_checkpoint,
+        new_val_sequence_accuracy=val_metrics['sequence_accuracy'],
+        new_test_sequence_accuracy=test_metrics['sequence_accuracy'],
+    ):
+        torch.save(checkpoint, output_paths['best_checkpoint'])
+        if export_quantized_model(model, str(output_paths['quantized_checkpoint'])):
+            print(f'Saved quantized checkpoint to {output_paths["quantized_checkpoint"]}')
+        print(f'Saved best checkpoint to {output_paths["best_checkpoint"]}')
+    else:
+        previous_val_sequence_accuracy, previous_test_sequence_accuracy = extract_checkpoint_sequence_metrics(
+            existing_best_checkpoint
+        )
+        print(
+            'Keeping existing best checkpoint because the new run did not improve both sequence metrics: '
+            f'old_val_seq_acc = {previous_val_sequence_accuracy:.6f}, '
+            f'old_test_seq_acc = {previous_test_sequence_accuracy:.6f}, '
+            f'new_val_seq_acc = {val_metrics["sequence_accuracy"]:.6f}, '
+            f'new_test_seq_acc = {test_metrics["sequence_accuracy"]:.6f}'
+        )
 
     summary = {
         'seed': args.seed,
