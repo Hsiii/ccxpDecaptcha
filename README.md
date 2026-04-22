@@ -24,8 +24,8 @@ pip install -r requirements.txt
 You can run the tools in either style:
 
 ```bash
-python captcha/train.py
-python -m captcha.train
+python decaptcha/train.py
+python -m decaptcha.train
 ```
 
 The same pattern works for `collect`, `relabel`, and `build`.
@@ -35,8 +35,8 @@ The same pattern works for `collect`, `relabel`, and `build`.
 1. Collect labeled captchas:
 
 ```bash
-python captcha/collect.py
-python -m captcha.collect
+python decaptcha/collect.py
+python -m decaptcha.collect
 ```
 
 - Download captcha images from CCXP and label them manually.
@@ -46,8 +46,8 @@ python -m captcha.collect
 2. Build the dataset arrays:
 
 ```bash
-python captcha/build.py
-python -m captcha.build
+python decaptcha/build.py
+python -m decaptcha.build
 ```
 
 This writes:
@@ -59,15 +59,15 @@ This writes:
 If you mislabel a captcha batch, relabel the whole grouped filename set before rebuilding:
 
 ```bash
-python captcha/relabel.py
-python -m captcha.relabel
+python decaptcha/relabel.py
+python -m decaptcha.relabel
 ```
 
 3. Train and evaluate:
 
 ```bash
-python captcha/train.py
-python -m captcha.train
+python decaptcha/train.py
+python -m decaptcha.train
 ```
 
 Training behavior:
