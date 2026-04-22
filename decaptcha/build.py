@@ -69,8 +69,8 @@ def build_arrays(src: pathlib.Path, out_dir: pathlib.Path):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--src', default='/data')
-    parser.add_argument('--out', default='/data')
+    parser.add_argument('--src', default='data')
+    parser.add_argument('--out', default='data')
     return parser.parse_args()
 
 

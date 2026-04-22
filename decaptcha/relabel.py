@@ -112,14 +112,14 @@ def rename_group_files(raw_dir: Path, group: str, old_label: str, new_label: str
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Relabel one grouped captcha batch in /data.')
+    parser = argparse.ArgumentParser(description='Relabel one grouped captcha batch in data/.')
     parser.add_argument(
         'group_or_label',
         nargs='?',
         help='Group id, or the new label when targeting the latest group.',
     )
     parser.add_argument('new_label', nargs='?', help='Correct 6-digit label to write into filenames.')
-    parser.add_argument('--raw-dir', default='/data', help='Directory containing the collected PNG files.')
+    parser.add_argument('--raw-dir', default='data', help='Directory containing the collected PNG files.')
     parser.add_argument(
         '--latest',
         '--edit-latest',

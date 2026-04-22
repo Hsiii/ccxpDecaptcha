@@ -107,7 +107,7 @@ def collect_many(save_dir: Path, n_round: int, cnt_per_round: int):
 
 
 if __name__ == '__main__':
-    dire = Path('/data')
+    dire = Path('data')
     if not dire.exists():
         dire.mkdir(parents=True)
 

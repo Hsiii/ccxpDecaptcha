@@ -54,7 +54,7 @@ python -m decaptcha.train
 - `ReduceLROnPlateau` scheduler on validation loss
 - early stopping after `8` stale validation epochs
 - best checkpoint selected by validation exact-sequence accuracy
-- resumes from `/out/last.pt` if exists, otherwise starts fresh
+- resumes from `out/last.pt` if exists, otherwise starts fresh
 - overwrites canonical artifacts by default, pass `--no-overwrite` to disable
 - random split seed by default, pass `--seed` to set a fixed seed for reproducibility
 
