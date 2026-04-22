@@ -2,11 +2,12 @@ import argparse
 import csv
 import os
 import random
+import shutil
 import warnings
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -19,13 +20,13 @@ from model import DIGITS, SixHeadCaptchaNet
 
 
 import time
-SEED = None  # Default: random split
+DEFAULT_SEED = None  # Default: random split
 MAX_TRAIN_RENDERS_PER_GROUP = 20
 EARLY_STOPPING_PATIENCE = 8
 LR_PLATEAU_PATIENCE = 3
 
 
-def seed_everything(seed: int = SEED):
+def seed_everything(seed: Optional[int] = DEFAULT_SEED):
     if seed is None:
         # Use current time for randomness
         seed = int(time.time() * 1000) % (2**32 - 1)
@@ -51,11 +52,13 @@ class CaptchaDataset(data.Dataset):
         split_name: str = 'train',
         train_ratio: float = 0.7,
         val_ratio: float = 0.15,
-        seed: int = SEED,
+        data_prefix: str = 'captcha',
+        seed: Optional[int] = DEFAULT_SEED,
     ):
-        images = np.load(os.path.join(path_to_data_root, 'captcha_images.npy'))
-        labels = np.load(os.path.join(path_to_data_root, 'captcha_labels.npy'))
-        groups = np.load(os.path.join(path_to_data_root, 'captcha_groups.npy'))
+        prefix = os.path.join(path_to_data_root, data_prefix)
+        images = np.load(f'{prefix}_images.npy')
+        labels = np.load(f'{prefix}_labels.npy')
+        groups = np.load(f'{prefix}_groups.npy')
 
         # If seed is None, use a random seed for each run
         actual_seed = seed if seed is not None else int(time.time() * 1000) % (2**32 - 1)
@@ -360,6 +363,11 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--resume', default='decaptcha_last.pt')
     parser.add_argument('--epochs', type=int, default=30)
+    parser.add_argument('--seed', type=int, default=DEFAULT_SEED)
+    parser.add_argument('--data-root', default='.')
+    parser.add_argument('--data-prefix', default='captcha')
+    parser.add_argument('--output-dir', default='.')
+    parser.add_argument('--overwrite-output', action='store_true')
     return parser.parse_args()
 
 
@@ -374,15 +382,68 @@ def maybe_resume(model: nn.Module, checkpoint_path: str):
     print(f'Resumed weights from {checkpoint_path}.')
 
 
+def build_output_paths(output_dir: Path) -> Dict[str, Path]:
+    return {
+        'last_checkpoint': output_dir / 'decaptcha_last.pt',
+        'best_checkpoint': output_dir / 'decaptcha_best_val_seq.pt',
+        'quantized_checkpoint': output_dir / 'decaptcha.int8.pt',
+        'val_failures': output_dir / 'val_failures.csv',
+        'test_failures': output_dir / 'test_failures.csv',
+        'val_confusion': output_dir / 'val_confusion_matrix.npy',
+        'test_confusion': output_dir / 'test_confusion_matrix.npy',
+        'metrics_summary': output_dir / 'metrics_summary.json',
+    }
+
+
+def prepare_output_dir(output_dir: Path, overwrite_output: bool):
+    paths = build_output_paths(output_dir)
+    existing = [path for path in paths.values() if path.exists()]
+    if existing and not overwrite_output:
+        joined = ', '.join(str(path) for path in existing)
+        raise FileExistsError(
+            f'Refusing to overwrite existing training artifacts in {output_dir}: {joined}. '
+            'Pass --overwrite-output to replace them or choose a new --output-dir.'
+        )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if overwrite_output:
+        for path in existing:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+    return paths
+
+
 if __name__ == '__main__':
     args = parse_args()
-    seed_everything()
+    seed_everything(args.seed)
+    output_dir = Path(args.output_dir)
+    output_paths = prepare_output_dir(output_dir, overwrite_output=args.overwrite_output)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_transform, eval_transform = build_transforms()
-    train_dataset = CaptchaDataset(transform=train_transform, split_name='train')
-    val_dataset = CaptchaDataset(transform=eval_transform, split_name='val')
-    test_dataset = CaptchaDataset(transform=eval_transform, split_name='test')
+    train_dataset = CaptchaDataset(
+        path_to_data_root=args.data_root,
+        data_prefix=args.data_prefix,
+        transform=train_transform,
+        split_name='train',
+        seed=args.seed,
+    )
+    val_dataset = CaptchaDataset(
+        path_to_data_root=args.data_root,
+        data_prefix=args.data_prefix,
+        transform=eval_transform,
+        split_name='val',
+        seed=args.seed,
+    )
+    test_dataset = CaptchaDataset(
+        path_to_data_root=args.data_root,
+        data_prefix=args.data_prefix,
+        transform=eval_transform,
+        split_name='test',
+        seed=args.seed,
+    )
 
     describe_split('train', train_dataset)
     describe_split('val', val_dataset)
@@ -428,7 +489,7 @@ if __name__ == '__main__':
         'sequence_accuracy': best_sequence_accuracy,
         'digits': DIGITS,
     }
-    torch.save(last_checkpoint, 'decaptcha_last.pt')
+    torch.save(last_checkpoint, output_paths['last_checkpoint'])
 
     model.load_state_dict(best_state)
     val_loss, val_metrics, val_summary, val_rows = test_one_epoch(model, val_loader, loss, device)
@@ -448,10 +509,10 @@ if __name__ == '__main__':
         f'test_digit_acc = {test_metrics["digit_accuracy"]:.6f}'
     )
 
-    np.save('val_confusion_matrix.npy', val_summary['confusion_matrix'])
-    np.save('test_confusion_matrix.npy', test_summary['confusion_matrix'])
-    export_failure_rows(val_rows, Path('val_failures.csv'))
-    export_failure_rows(test_rows, Path('test_failures.csv'))
+    np.save(output_paths['val_confusion'], val_summary['confusion_matrix'])
+    np.save(output_paths['test_confusion'], test_summary['confusion_matrix'])
+    export_failure_rows(val_rows, output_paths['val_failures'])
+    export_failure_rows(test_rows, output_paths['test_failures'])
     print(f'val_position_acc = {val_summary["position_accuracy"]}')
     print(f'test_position_acc = {test_summary["position_accuracy"]}')
 
@@ -468,7 +529,25 @@ if __name__ == '__main__':
             'position_accuracy': test_summary['position_accuracy'],
         },
         'digits': DIGITS,
+        'seed': args.seed,
+        'data_prefix': args.data_prefix,
     }
-    torch.save(checkpoint, 'decaptcha_best_val_seq.pt')
-    if export_quantized_model(model, 'decaptcha.int8.pt'):
-        print('Saved quantized checkpoint to decaptcha.int8.pt')
+    torch.save(checkpoint, output_paths['best_checkpoint'])
+    if export_quantized_model(model, str(output_paths['quantized_checkpoint'])):
+        print(f'Saved quantized checkpoint to {output_paths["quantized_checkpoint"]}')
+
+    summary = {
+        'seed': args.seed,
+        'data_prefix': args.data_prefix,
+        'resume': args.resume,
+        'output_dir': str(output_dir),
+        'val_metrics': val_metrics,
+        'test_metrics': test_metrics,
+        'val_position_accuracy': val_summary['position_accuracy'],
+        'test_position_accuracy': test_summary['position_accuracy'],
+        'best_sequence_accuracy': best_sequence_accuracy,
+    }
+    with output_paths['metrics_summary'].open('w') as fp:
+        import json
+        json.dump(summary, fp, indent=2)
+    print(f'Saved metrics summary to {output_paths["metrics_summary"]}')

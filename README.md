@@ -37,6 +37,12 @@ This writes:
 - `captcha_labels.npy`
 - `captcha_groups.npy`
 
+For a non-destructive crop experiment, write a second dataset prefix instead of replacing the baseline arrays:
+
+```bash
+python decaptcha/build_dataset.py --crop-right 13 --output-prefix captcha_crop13
+```
+
 If you mislabel a captcha batch, relabel the whole grouped filename set before rebuilding:
 
 ```bash
@@ -47,6 +53,13 @@ python decaptcha/relabel_data.py --latest
 
 ```bash
 python decaptcha/train_model.py
+```
+
+For reproducible A/B comparisons, pin the split seed and write artifacts to a separate output directory:
+
+```bash
+python decaptcha/train_model.py --seed 20260422 --output-dir runs/baseline-seed-20260422
+python decaptcha/train_model.py --seed 20260422 --data-prefix captcha_crop13 --output-dir runs/crop13-seed-20260422
 ```
 
 Training behavior:
@@ -67,3 +80,4 @@ Outputs:
 - `test_failures.csv`
 - `val_confusion_matrix.npy`
 - `test_confusion_matrix.npy`
+- `metrics_summary.json`
