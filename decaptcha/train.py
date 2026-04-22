@@ -27,6 +27,7 @@ DEFAULT_SEED = None
 MAX_TRAIN_RENDERS_PER_GROUP = 20
 EARLY_STOPPING_PATIENCE = 8
 LR_PLATEAU_PATIENCE = 3
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def seed_everything(seed: Optional[int] = DEFAULT_SEED):
@@ -367,7 +368,18 @@ def parse_args():
     parser.add_argument('--out', default='out')
     parser.add_argument('--overwrite', action='store_true', default=True)
     parser.add_argument('--no-overwrite', dest='overwrite', action='store_false')
-    return parser.parse_args()
+    args = parser.parse_args()
+    args.resume = str(resolve_repo_path(args.resume))
+    args.data = str(resolve_repo_path(args.data))
+    args.out = str(resolve_repo_path(args.out))
+    return args
+
+
+def resolve_repo_path(path_str: str) -> Path:
+    path = Path(path_str).expanduser()
+    if path.is_absolute():
+        return path
+    return REPO_ROOT / path
 
 
 def maybe_resume(model: nn.Module, checkpoint_path: str):
@@ -417,9 +429,6 @@ def prepare_output_dir(output_dir: Path, overwrite_output: bool):
 if __name__ == '__main__':
     args = parse_args()
     seed_everything(args.seed)
-    output_dir = Path(args.out)
-    output_paths = prepare_output_dir(output_dir, overwrite_output=args.overwrite)
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_transform, eval_transform = build_transforms()
     train_dataset = CaptchaDataset(data_dir=args.data, transform=train_transform, split_name='train', seed=args.seed)
@@ -441,6 +450,9 @@ if __name__ == '__main__':
 
     model = Net().to(device)
     maybe_resume(model, args.resume)
+
+    output_dir = Path(args.out)
+    output_paths = prepare_output_dir(output_dir, overwrite_output=args.overwrite)
 
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-4)
