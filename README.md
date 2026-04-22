@@ -1,8 +1,8 @@
 # ccxpDecaptcha
 
-Local-only training pipeline for the NTHU CCXP captcha model.
+A training pipeline for NTHU CCXP decaptcha model.
 
-Based on the work by [25349023](https://github.com/25349023), this fork keeps only the local training workflow and replaces fixed-width per-digit slicing with a full-image six-head architecture. The model is then re-trained from scratch on a new dataset of 500+ manually labeled captcha renders collected in 2026, achieving a test set exact-sequence accuracy of **97.7%**, and test set digit-level accuracy of **99.6%**.
+Based on the work by [25349023](https://github.com/25349023), this fork enhances the local training workflow and the model architecture with a new cropped full-image six-head model. The model is retrained from scratch on a new dataset of 600 manually labeled captcha renders collected in 2026 April, achieving significantly improved performance of 99.7% six-digit sequence accuracy and 99.9% individual digit accuracy.
 
 ## Setup
 
@@ -13,32 +13,25 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-You can run the tools in either style:
-
-```bash
-python decaptcha/train.py
-python -m decaptcha.train
-```
-
-The same pattern works for `collect`, `relabel`, and `build`.
-
 ## Workflow
 
-1. Collect labeled captchas:
+1. Collect captcha data:
 
 ```bash
-python decaptcha/collect.py
 python -m decaptcha.collect
 ```
 
-- Download captcha images from CCXP and label them manually.
-- Captchas will be rendered inline in the terminal.
-- Repeated renders from the same `pwdstr` stay grouped in the saved filename.
+- Download captcha images from CCXP and directly render in terminal for labeling
+
+If you mislabel a captcha, relabel before labelling the next one:
+
+```bash
+python -m decaptcha.relabel
+```
 
 2. Build the dataset arrays:
 
 ```bash
-python decaptcha/build.py
 python -m decaptcha.build
 ```
 
@@ -48,21 +41,12 @@ This writes:
 - `labels.npy`
 - `groups.npy`
 
-If you mislabel a captcha batch, relabel the whole grouped filename set before rebuilding:
-
-```bash
-python decaptcha/relabel.py
-python -m decaptcha.relabel
-```
 
 3. Train and evaluate:
 
 ```bash
-python decaptcha/train.py
 python -m decaptcha.train
 ```
-
-Training behavior:
 
 - grouped `train/val/test` split by captcha `pwdstr`
 - train split capped to `20` renders per captcha group
@@ -70,6 +54,9 @@ Training behavior:
 - `ReduceLROnPlateau` scheduler on validation loss
 - early stopping after `8` stale validation epochs
 - best checkpoint selected by validation exact-sequence accuracy
+- resumes from `/out/last.pt` if exists, otherwise starts fresh
+- overwrites canonical artifacts by default, pass `--no-overwrite` to disable
+- random split seed by default, pass `--seed` to set a fixed seed for reproducibility
 
 Outputs:
 
@@ -82,11 +69,10 @@ Outputs:
 - `test_cm.npy`
 - `metrics.json`
 
-`train.py` resumes from `/out/last.pt`, overwrites the canonical artifacts by default, and uses a random split seed unless `--seed` is provided. Pass `--no-overwrite` if you want the safety guard back.
+## License
 
-Default paths:
+This project is released under the MIT License.
 
-- raw captcha PNGs: `/data`
-- built dataset arrays: `/data`
-- training outputs and checkpoints: `/out`
-- resume checkpoint: `/out/last.pt`
+- Original forked work remains attributed to [25349023](https://github.com/25349023).
+- Modifications and rewritten portions are additionally copyright (c) 2026 Hsi.
+- The upstream MIT notice is preserved in [LICENSE](LICENSE).
