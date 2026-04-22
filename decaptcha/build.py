@@ -1,9 +1,11 @@
-import pathlib
 import argparse
+import pathlib
 from typing import Tuple
 
 import numpy as np
 from PIL import Image
+
+CROP_RIGHT = 13
 
 
 def parse_metadata(path: pathlib.Path) -> Tuple[str, str]:
@@ -25,22 +27,20 @@ def load_image(path: pathlib.Path) -> np.ndarray:
         return np.asarray(image.convert('RGB'), dtype=np.uint8)
 
 
-def crop_image(image: np.ndarray, crop_right: int) -> np.ndarray:
-    if crop_right <= 0:
-        return image
-    if crop_right >= image.shape[1]:
-        raise ValueError(f'crop_right={crop_right} removes the entire image width {image.shape[1]}')
-    return image[:, :-crop_right, :]
+def crop_image(image: np.ndarray) -> np.ndarray:
+    if CROP_RIGHT >= image.shape[1]:
+        raise ValueError(f'CROP_RIGHT={CROP_RIGHT} removes the entire image width {image.shape[1]}')
+    return image[:, :-CROP_RIGHT, :]
 
 
-def generate_dataset_from(src: pathlib.Path, output_prefix: pathlib.Path, crop_right: int = 0):
+def build_arrays(src: pathlib.Path, out_dir: pathlib.Path):
     images = []
     labels = []
     groups = []
 
     for count, path in enumerate(sorted(src.glob('*.png')), start=1):
         label, group = parse_metadata(path)
-        images.append(crop_image(load_image(path), crop_right=crop_right))
+        images.append(crop_image(load_image(path)))
         labels.append([int(digit) for digit in label])
         groups.append(group)
 
@@ -56,10 +56,10 @@ def generate_dataset_from(src: pathlib.Path, output_prefix: pathlib.Path, crop_r
 
     print(image_array.shape, label_array.shape, group_array.shape)
 
-    image_path = output_prefix.with_name(f'{output_prefix.name}_images.npy')
-    label_path = output_prefix.with_name(f'{output_prefix.name}_labels.npy')
-    group_path = output_prefix.with_name(f'{output_prefix.name}_groups.npy')
-    output_prefix.parent.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    image_path = out_dir / 'images.npy'
+    label_path = out_dir / 'labels.npy'
+    group_path = out_dir / 'groups.npy'
 
     np.save(image_path, image_array)
     np.save(label_path, label_array)
@@ -69,17 +69,16 @@ def generate_dataset_from(src: pathlib.Path, output_prefix: pathlib.Path, crop_r
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--src-dir', default='./raw_data/')
-    parser.add_argument('--output-prefix', default='captcha')
-    parser.add_argument('--crop-right', type=int, default=0)
+    parser.add_argument('--src', default='raw_data')
+    parser.add_argument('--out', default='.')
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     args = parse_args()
-    src_dir = pathlib.Path(args.src_dir)
+    src_dir = pathlib.Path(args.src)
 
     if not src_dir.exists():
         raise OSError(f'Source directory {src_dir} not found.')
 
-    generate_dataset_from(src_dir, pathlib.Path(args.output_prefix), crop_right=args.crop_right)
+    build_arrays(src_dir, pathlib.Path(args.out))

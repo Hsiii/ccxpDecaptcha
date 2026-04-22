@@ -22,7 +22,7 @@ class DepthwiseSeparableBlock(nn.Module):
         return self.block(x)
 
 
-class SixHeadCaptchaNet(nn.Module):
+class Net(nn.Module):
     def __init__(self, digits: int = DIGITS, channels: int = 64):
         super().__init__()
         self.digits = digits

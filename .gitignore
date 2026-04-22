@@ -17,3 +17,6 @@ __pycache__/
 # Training artifacts
 *.pt
 *_failures.csv
+val.csv
+test.csv
+metrics.json

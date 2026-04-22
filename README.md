@@ -18,7 +18,7 @@ pip install -r requirements.txt
 1. Collect labeled captchas:
 
 ```bash
-python decaptcha/collect_data.py
+python decaptcha/collect.py
 ```
 
 - Download captcha images from CCXP and label them manually.
@@ -28,38 +28,25 @@ python decaptcha/collect_data.py
 2. Build the dataset arrays:
 
 ```bash
-python decaptcha/build_dataset.py
+python decaptcha/build.py
 ```
 
 This writes:
 
-- `captcha_images.npy`
-- `captcha_labels.npy`
-- `captcha_groups.npy`
-
-For a non-destructive crop experiment, write a second dataset prefix instead of replacing the baseline arrays:
-
-```bash
-python decaptcha/build_dataset.py --crop-right 13 --output-prefix captcha_crop13
-```
+- `images.npy`
+- `labels.npy`
+- `groups.npy`
 
 If you mislabel a captcha batch, relabel the whole grouped filename set before rebuilding:
 
 ```bash
-python decaptcha/relabel_data.py --latest
+python decaptcha/relabel.py --latest
 ```
 
 3. Train and evaluate:
 
 ```bash
-python decaptcha/train_model.py
-```
-
-For reproducible A/B comparisons, pin the split seed and write artifacts to a separate output directory:
-
-```bash
-python decaptcha/train_model.py --seed 20260422 --output-dir runs/baseline-seed-20260422
-python decaptcha/train_model.py --seed 20260422 --data-prefix captcha_crop13 --output-dir runs/crop13-seed-20260422
+python decaptcha/train.py
 ```
 
 Training behavior:
@@ -73,11 +60,13 @@ Training behavior:
 
 Outputs:
 
-- `decaptcha_best_val_seq.pt`
-- `decaptcha_last.pt`
-- `decaptcha.int8.pt`
-- `val_failures.csv`
-- `test_failures.csv`
-- `val_confusion_matrix.npy`
-- `test_confusion_matrix.npy`
-- `metrics_summary.json`
+- `best.pt`
+- `last.pt`
+- `int8.pt`
+- `val.csv`
+- `test.csv`
+- `val_cm.npy`
+- `test_cm.npy`
+- `metrics.json`
+
+The trainer refuses to overwrite an existing output directory unless `--overwrite` is passed explicitly.

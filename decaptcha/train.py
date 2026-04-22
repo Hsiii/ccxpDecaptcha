@@ -1,8 +1,10 @@
 import argparse
 import csv
+import json
 import os
 import random
 import shutil
+import time
 import warnings
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -16,11 +18,9 @@ import tqdm
 from torch import nn
 from torch.utils import data
 
-from model import DIGITS, SixHeadCaptchaNet
+from net import DIGITS, Net
 
-
-import time
-DEFAULT_SEED = None  # Default: random split
+DEFAULT_SEED = None
 MAX_TRAIN_RENDERS_PER_GROUP = 20
 EARLY_STOPPING_PATIENCE = 8
 LR_PLATEAU_PATIENCE = 3
@@ -28,7 +28,6 @@ LR_PLATEAU_PATIENCE = 3
 
 def seed_everything(seed: Optional[int] = DEFAULT_SEED):
     if seed is None:
-        # Use current time for randomness
         seed = int(time.time() * 1000) % (2**32 - 1)
     random.seed(seed)
     np.random.seed(seed)
@@ -47,20 +46,17 @@ class DatasetSplit:
 class CaptchaDataset(data.Dataset):
     def __init__(
         self,
-        path_to_data_root='.',
+        data_dir='.',
         transform=None,
         split_name: str = 'train',
         train_ratio: float = 0.7,
         val_ratio: float = 0.15,
-        data_prefix: str = 'captcha',
         seed: Optional[int] = DEFAULT_SEED,
     ):
-        prefix = os.path.join(path_to_data_root, data_prefix)
-        images = np.load(f'{prefix}_images.npy')
-        labels = np.load(f'{prefix}_labels.npy')
-        groups = np.load(f'{prefix}_groups.npy')
+        images = np.load(os.path.join(data_dir, 'images.npy'))
+        labels = np.load(os.path.join(data_dir, 'labels.npy'))
+        groups = np.load(os.path.join(data_dir, 'groups.npy'))
 
-        # If seed is None, use a random seed for each run
         actual_seed = seed if seed is not None else int(time.time() * 1000) % (2**32 - 1)
         split = self._build_split(groups, train_ratio=train_ratio, val_ratio=val_ratio, seed=actual_seed)
         split_indices = {
@@ -361,13 +357,12 @@ def export_quantized_model(model: nn.Module, output_path: str):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--resume', default='decaptcha_last.pt')
+    parser.add_argument('--resume', default='last.pt')
     parser.add_argument('--epochs', type=int, default=30)
     parser.add_argument('--seed', type=int, default=DEFAULT_SEED)
-    parser.add_argument('--data-root', default='.')
-    parser.add_argument('--data-prefix', default='captcha')
-    parser.add_argument('--output-dir', default='.')
-    parser.add_argument('--overwrite-output', action='store_true')
+    parser.add_argument('--data', default='.')
+    parser.add_argument('--out', default='.')
+    parser.add_argument('--overwrite', action='store_true')
     return parser.parse_args()
 
 
@@ -384,14 +379,14 @@ def maybe_resume(model: nn.Module, checkpoint_path: str):
 
 def build_output_paths(output_dir: Path) -> Dict[str, Path]:
     return {
-        'last_checkpoint': output_dir / 'decaptcha_last.pt',
-        'best_checkpoint': output_dir / 'decaptcha_best_val_seq.pt',
-        'quantized_checkpoint': output_dir / 'decaptcha.int8.pt',
-        'val_failures': output_dir / 'val_failures.csv',
-        'test_failures': output_dir / 'test_failures.csv',
-        'val_confusion': output_dir / 'val_confusion_matrix.npy',
-        'test_confusion': output_dir / 'test_confusion_matrix.npy',
-        'metrics_summary': output_dir / 'metrics_summary.json',
+        'last_checkpoint': output_dir / 'last.pt',
+        'best_checkpoint': output_dir / 'best.pt',
+        'quantized_checkpoint': output_dir / 'int8.pt',
+        'val_failures': output_dir / 'val.csv',
+        'test_failures': output_dir / 'test.csv',
+        'val_confusion': output_dir / 'val_cm.npy',
+        'test_confusion': output_dir / 'test_cm.npy',
+        'metrics_summary': output_dir / 'metrics.json',
     }
 
 
@@ -402,7 +397,7 @@ def prepare_output_dir(output_dir: Path, overwrite_output: bool):
         joined = ', '.join(str(path) for path in existing)
         raise FileExistsError(
             f'Refusing to overwrite existing training artifacts in {output_dir}: {joined}. '
-            'Pass --overwrite-output to replace them or choose a new --output-dir.'
+            'Pass --overwrite to replace them or choose a new --out.'
         )
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -418,32 +413,14 @@ def prepare_output_dir(output_dir: Path, overwrite_output: bool):
 if __name__ == '__main__':
     args = parse_args()
     seed_everything(args.seed)
-    output_dir = Path(args.output_dir)
-    output_paths = prepare_output_dir(output_dir, overwrite_output=args.overwrite_output)
+    output_dir = Path(args.out)
+    output_paths = prepare_output_dir(output_dir, overwrite_output=args.overwrite)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_transform, eval_transform = build_transforms()
-    train_dataset = CaptchaDataset(
-        path_to_data_root=args.data_root,
-        data_prefix=args.data_prefix,
-        transform=train_transform,
-        split_name='train',
-        seed=args.seed,
-    )
-    val_dataset = CaptchaDataset(
-        path_to_data_root=args.data_root,
-        data_prefix=args.data_prefix,
-        transform=eval_transform,
-        split_name='val',
-        seed=args.seed,
-    )
-    test_dataset = CaptchaDataset(
-        path_to_data_root=args.data_root,
-        data_prefix=args.data_prefix,
-        transform=eval_transform,
-        split_name='test',
-        seed=args.seed,
-    )
+    train_dataset = CaptchaDataset(data_dir=args.data, transform=train_transform, split_name='train', seed=args.seed)
+    val_dataset = CaptchaDataset(data_dir=args.data, transform=eval_transform, split_name='val', seed=args.seed)
+    test_dataset = CaptchaDataset(data_dir=args.data, transform=eval_transform, split_name='test', seed=args.seed)
 
     describe_split('train', train_dataset)
     describe_split('val', val_dataset)
@@ -458,7 +435,7 @@ if __name__ == '__main__':
     val_loader = data.DataLoader(val_dataset, batch_size=256, shuffle=False, num_workers=0)
     test_loader = data.DataLoader(test_dataset, batch_size=256, shuffle=False, num_workers=0)
 
-    model = SixHeadCaptchaNet().to(device)
+    model = Net().to(device)
     maybe_resume(model, args.resume)
 
     loss = nn.CrossEntropyLoss()
@@ -469,7 +446,6 @@ if __name__ == '__main__':
         factor=0.5,
         patience=LR_PLATEAU_PATIENCE,
     )
-    epochs = args.epochs
 
     best_state, best_sequence_accuracy = fit(
         model,
@@ -479,7 +455,7 @@ if __name__ == '__main__':
         optimizer,
         device=device,
         scheduler=scheduler,
-        epochs=epochs,
+        epochs=args.epochs,
     )
     if best_state is None:
         raise RuntimeError('Training did not produce a checkpoint.')
@@ -530,7 +506,7 @@ if __name__ == '__main__':
         },
         'digits': DIGITS,
         'seed': args.seed,
-        'data_prefix': args.data_prefix,
+        'data_dir': args.data,
     }
     torch.save(checkpoint, output_paths['best_checkpoint'])
     if export_quantized_model(model, str(output_paths['quantized_checkpoint'])):
@@ -538,7 +514,7 @@ if __name__ == '__main__':
 
     summary = {
         'seed': args.seed,
-        'data_prefix': args.data_prefix,
+        'data_dir': args.data,
         'resume': args.resume,
         'output_dir': str(output_dir),
         'val_metrics': val_metrics,
@@ -548,6 +524,5 @@ if __name__ == '__main__':
         'best_sequence_accuracy': best_sequence_accuracy,
     }
     with output_paths['metrics_summary'].open('w') as fp:
-        import json
         json.dump(summary, fp, indent=2)
     print(f'Saved metrics summary to {output_paths["metrics_summary"]}')
