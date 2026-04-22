@@ -37,9 +37,9 @@ python -m decaptcha.build
 
 This writes:
 
-- `images.npy`
-- `labels.npy`
-- `groups.npy`
+- `data/images.npy`
+- `data/labels.npy`
+- `data/groups.npy`
 
 
 3. Train and evaluate:
@@ -60,14 +60,14 @@ python -m decaptcha.train
 
 Outputs:
 
-- `best.pt`
-- `last.pt`
-- `int8.pt`
-- `val.csv`
-- `test.csv`
-- `val_cm.npy`
-- `test_cm.npy`
-- `metrics.json`
+- `out/best.pt`
+- `out/last.pt`
+- `out/int8.pt`
+- `out/val.csv`
+- `out/test.csv`
+- `out/val_cm.npy`
+- `out/test_cm.npy`
+- `out/metrics.json`
 
 ## License
 

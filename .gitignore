@@ -3,7 +3,10 @@
 
 # Local datasets and raw captures
 raw_data/
-data/
+data/*
+!data/.gitkeep
+out/*
+!out/.gitkeep
 *.npy
 *.zip
 
