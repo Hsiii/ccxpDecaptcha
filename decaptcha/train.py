@@ -18,7 +18,10 @@ import tqdm
 from torch import nn
 from torch.utils import data
 
-from net import DIGITS, Net
+try:
+    from .net import DIGITS, Net
+except ImportError:
+    from net import DIGITS, Net
 
 DEFAULT_SEED = None
 MAX_TRAIN_RENDERS_PER_GROUP = 20
