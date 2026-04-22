@@ -5,6 +5,11 @@ from typing import Tuple
 import numpy as np
 from PIL import Image
 
+try:
+    from .paths import resolve_repo_path
+except ImportError:
+    from paths import resolve_repo_path
+
 CROP_RIGHT = 13
 
 
@@ -71,7 +76,10 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--src', default='data')
     parser.add_argument('--out', default='data')
-    return parser.parse_args()
+    args = parser.parse_args()
+    args.src = str(resolve_repo_path(args.src))
+    args.out = str(resolve_repo_path(args.out))
+    return args
 
 
 if __name__ == '__main__':

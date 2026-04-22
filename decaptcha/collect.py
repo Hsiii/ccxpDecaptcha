@@ -8,6 +8,11 @@ import urllib3
 from PIL import Image
 from bs4 import BeautifulSoup
 
+try:
+    from .paths import resolve_repo_path
+except ImportError:
+    from paths import resolve_repo_path
+
 BASE_URL = 'https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/'
 
 
@@ -107,7 +112,7 @@ def collect_many(save_dir: Path, n_round: int, cnt_per_round: int):
 
 
 if __name__ == '__main__':
-    dire = Path('data')
+    dire = resolve_repo_path('data')
     if not dire.exists():
         dire.mkdir(parents=True)
 

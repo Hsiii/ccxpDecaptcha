@@ -5,6 +5,11 @@ from typing import Iterable, List, Tuple
 
 from PIL import Image
 
+try:
+    from .paths import resolve_repo_path
+except ImportError:
+    from paths import resolve_repo_path
+
 
 def render_image_in_terminal(content: bytes):
     with Image.open(io.BytesIO(content)) as image:
@@ -144,7 +149,7 @@ def main():
     )
     args = parser.parse_args()
 
-    raw_dir = Path(args.raw_dir)
+    raw_dir = resolve_repo_path(args.raw_dir)
     if args.latest:
         if args.new_label is not None:
             raise ValueError('When using --latest, pass at most one positional argument for the new label.')

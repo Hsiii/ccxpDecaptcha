@@ -20,14 +20,15 @@ from torch.utils import data
 
 try:
     from .net import DIGITS, Net
+    from .paths import resolve_repo_path
 except ImportError:
     from net import DIGITS, Net
+    from paths import resolve_repo_path
 
 DEFAULT_SEED = None
 MAX_TRAIN_RENDERS_PER_GROUP = 20
 EARLY_STOPPING_PATIENCE = 8
 LR_PLATEAU_PATIENCE = 3
-REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def seed_everything(seed: Optional[int] = DEFAULT_SEED):
@@ -375,13 +376,6 @@ def parse_args():
     return args
 
 
-def resolve_repo_path(path_str: str) -> Path:
-    path = Path(path_str).expanduser()
-    if path.is_absolute():
-        return path
-    return REPO_ROOT / path
-
-
 def maybe_resume(model: nn.Module, checkpoint_path: str):
     if not checkpoint_path or not os.path.exists(checkpoint_path):
         print(f'No resume checkpoint found at {checkpoint_path}; starting from scratch.')
@@ -406,8 +400,9 @@ def build_output_paths(output_dir: Path) -> Dict[str, Path]:
     }
 
 
-def prepare_output_dir(output_dir: Path, overwrite_output: bool):
+def prepare_output_dir(output_dir: Path, overwrite_output: bool, preserve_paths: Optional[List[Path]] = None):
     paths = build_output_paths(output_dir)
+    preserved = {path.resolve() for path in (preserve_paths or []) if path.exists()}
     existing = [path for path in paths.values() if path.exists()]
     if existing and not overwrite_output:
         joined = ', '.join(str(path) for path in existing)
@@ -419,6 +414,8 @@ def prepare_output_dir(output_dir: Path, overwrite_output: bool):
     output_dir.mkdir(parents=True, exist_ok=True)
     if overwrite_output:
         for path in existing:
+            if path.resolve() in preserved:
+                continue
             if path.is_dir():
                 shutil.rmtree(path)
             else:
@@ -452,7 +449,11 @@ if __name__ == '__main__':
     maybe_resume(model, args.resume)
 
     output_dir = Path(args.out)
-    output_paths = prepare_output_dir(output_dir, overwrite_output=args.overwrite)
+    output_paths = prepare_output_dir(
+        output_dir,
+        overwrite_output=args.overwrite,
+        preserve_paths=[Path(args.resume)],
+    )
 
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-4)
