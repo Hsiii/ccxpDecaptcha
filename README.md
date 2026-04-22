@@ -24,8 +24,8 @@ pip install -r requirements.txt
 You can run the tools in either style:
 
 ```bash
-python decaptcha/train.py
-python -m decaptcha.train
+python captcha/train.py
+python -m captcha.train
 ```
 
 The same pattern works for `collect`, `relabel`, and `build`.
@@ -35,8 +35,8 @@ The same pattern works for `collect`, `relabel`, and `build`.
 1. Collect labeled captchas:
 
 ```bash
-python decaptcha/collect.py
-python -m decaptcha.collect
+python captcha/collect.py
+python -m captcha.collect
 ```
 
 - Download captcha images from CCXP and label them manually.
@@ -46,8 +46,8 @@ python -m decaptcha.collect
 2. Build the dataset arrays:
 
 ```bash
-python decaptcha/build.py
-python -m decaptcha.build
+python captcha/build.py
+python -m captcha.build
 ```
 
 This writes:
@@ -59,15 +59,15 @@ This writes:
 If you mislabel a captcha batch, relabel the whole grouped filename set before rebuilding:
 
 ```bash
-python decaptcha/relabel.py
-python -m decaptcha.relabel
+python captcha/relabel.py
+python -m captcha.relabel
 ```
 
 3. Train and evaluate:
 
 ```bash
-python decaptcha/train.py
-python -m decaptcha.train
+python captcha/train.py
+python -m captcha.train
 ```
 
 Training behavior:
@@ -90,4 +90,11 @@ Outputs:
 - `test_cm.npy`
 - `metrics.json`
 
-`train.py` resumes from `last.pt`, overwrites the canonical artifacts by default, and uses a random split seed unless `--seed` is provided. Pass `--no-overwrite` if you want the safety guard back.
+`train.py` resumes from `/out/last.pt`, overwrites the canonical artifacts by default, and uses a random split seed unless `--seed` is provided. Pass `--no-overwrite` if you want the safety guard back.
+
+Default paths:
+
+- raw captcha PNGs: `/data`
+- built dataset arrays: `/data`
+- training outputs and checkpoints: `/out`
+- resume checkpoint: `/out/last.pt`

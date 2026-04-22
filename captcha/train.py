@@ -360,11 +360,11 @@ def export_quantized_model(model: nn.Module, output_path: str):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--resume', default='last.pt')
+    parser.add_argument('--resume', default='/out/last.pt')
     parser.add_argument('--epochs', type=int, default=30)
     parser.add_argument('--seed', type=int, default=DEFAULT_SEED)
-    parser.add_argument('--data', default='.')
-    parser.add_argument('--out', default='.')
+    parser.add_argument('--data', default='/data')
+    parser.add_argument('--out', default='/out')
     parser.add_argument('--overwrite', action='store_true', default=True)
     parser.add_argument('--no-overwrite', dest='overwrite', action='store_false')
     return parser.parse_args()
