@@ -40,7 +40,7 @@ This writes:
 If you mislabel a captcha batch, relabel the whole grouped filename set before rebuilding:
 
 ```bash
-python decaptcha/relabel.py --latest
+python decaptcha/relabel.py
 ```
 
 3. Train and evaluate:
@@ -69,4 +69,4 @@ Outputs:
 - `test_cm.npy`
 - `metrics.json`
 
-The trainer refuses to overwrite an existing output directory unless `--overwrite` is passed explicitly.
+`train.py` resumes from `last.pt`, overwrites the canonical artifacts by default, and uses a random split seed unless `--seed` is provided. Pass `--no-overwrite` if you want the safety guard back.

@@ -125,7 +125,7 @@ def main():
         '--edit-latest',
         dest='latest',
         action='store_true',
-        help='Relabel the most recently submitted captcha group.',
+        help='Relabel the most recently submitted captcha group. This is already the default when no group id is given.',
     )
     parser.add_argument(
         '--old-label',
