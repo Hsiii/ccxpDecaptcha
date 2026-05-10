@@ -156,6 +156,11 @@ def render_captcha(code: str, rng: random.Random) -> np.ndarray:
     image = Image.fromarray(image_np, mode='L')
     draw_noise(image, rng)
     rgb = np.asarray(image.convert('RGB'), dtype=np.uint8)
+    if rgb.shape != (IMAGE_HEIGHT, IMAGE_WIDTH, 3):
+        raise ValueError(
+            f'Synthetic OAuth captcha has unexpected shape {rgb.shape}; '
+            f'expected {(IMAGE_HEIGHT, IMAGE_WIDTH, 3)}'
+        )
     return rgb
 
 
@@ -176,7 +181,9 @@ def collect_many(save_dir: Path, groups: int, renders_per_group: int, seed: int 
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Generate synthetic OAuth captcha images using observed Securimage settings.')
+    parser = argparse.ArgumentParser(
+        description='Generate synthetic 150x80 OAuth captcha images using observed Securimage settings.'
+    )
     parser.add_argument('--out', default='data/oauth', help='Directory to write generated PNG files.')
     parser.add_argument('--groups', type=int, default=1000, help='Number of unique captcha codes to generate.')
     parser.add_argument('--renders-per-group', type=int, default=10, help='Number of rendered variants per code.')

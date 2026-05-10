@@ -64,7 +64,7 @@ Outputs:
 The original `ccxp` package remains the 6-digit CCXP pipeline. The `oauth` package is an alternative collector/build/train flow for the OAuth login page captcha.
 
 ### 1. Generate OAuth captcha data
-Generate synthetic captcha groups using the observed Securimage-style settings:
+Generate synthetic captcha groups using the observed Securimage-style settings. Output images match the site size exactly at `150x80`:
 ```bash
 python -m oauth.collect
 ```
@@ -76,11 +76,6 @@ Defaults:
 Example with explicit sizing:
 ```bash
 python -m oauth.collect --groups 1500 --renders-per-group 12 --seed 42
-```
-
-If you need to rename a generated label:
-```bash
-python -m oauth.relabel
 ```
 
 ### 2. Build the OAuth dataset arrays
