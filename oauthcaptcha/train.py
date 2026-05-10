@@ -48,6 +48,14 @@ class DatasetSplit:
     test_indices: np.ndarray
 
 
+@dataclass(frozen=True)
+class VariantRunConfig:
+    name: str
+    data_dir: str
+    output_dir: str
+    resume_path: str
+
+
 class CaptchaDataset(data.Dataset):
     def __init__(
         self,
@@ -363,17 +371,49 @@ def export_quantized_model(model: nn.Module, output_path: str):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--resume', default='out/oauthcaptcha/last.pt')
+    parser.add_argument('--clean-resume', default='out/oauthcaptcha_clean/last.pt')
     parser.add_argument('--epochs', type=int, default=30)
     parser.add_argument('--seed', type=int, default=DEFAULT_SEED)
     parser.add_argument('--data', default='data/oauthcaptcha')
+    parser.add_argument('--clean-data', default='data/oauthcaptcha_clean')
     parser.add_argument('--out', default='out/oauthcaptcha')
+    parser.add_argument('--clean-out', default='out/oauthcaptcha_clean')
+    parser.add_argument(
+        '--variant',
+        choices=('raw', 'clean', 'all'),
+        default='all',
+        help='Which dataset variant to train. Defaults to all available variants.',
+    )
     parser.add_argument('--overwrite', action='store_true', default=True)
     parser.add_argument('--no-overwrite', dest='overwrite', action='store_false')
     args = parser.parse_args()
     args.resume = str(resolve_repo_path(args.resume))
+    args.clean_resume = str(resolve_repo_path(args.clean_resume))
     args.data = str(resolve_repo_path(args.data))
+    args.clean_data = str(resolve_repo_path(args.clean_data))
     args.out = str(resolve_repo_path(args.out))
+    args.clean_out = str(resolve_repo_path(args.clean_out))
     return args
+
+
+def resolve_variant_runs(args) -> List[VariantRunConfig]:
+    variants = {
+        'raw': VariantRunConfig(
+            name='raw',
+            data_dir=args.data,
+            output_dir=args.out,
+            resume_path=args.resume,
+        ),
+        'clean': VariantRunConfig(
+            name='clean',
+            data_dir=args.clean_data,
+            output_dir=args.clean_out,
+            resume_path=args.clean_resume,
+        ),
+    }
+    if args.variant == 'all':
+        return [variants['raw'], variants['clean']]
+    return [variants[args.variant]]
 
 
 def maybe_resume(model: nn.Module, checkpoint_path: str):
@@ -464,14 +504,19 @@ def prepare_output_dir(output_dir: Path, overwrite_output: bool, preserve_paths:
     return paths
 
 
-if __name__ == '__main__':
-    args = parse_args()
-    seed_everything(args.seed)
+def run_training_variant(
+    variant: VariantRunConfig,
+    epochs: int,
+    seed: Optional[int],
+    overwrite_output: bool,
+) -> Dict[str, object]:
+    print(f'== Training variant: {variant.name} ==')
+    seed_everything(seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_transform, eval_transform = build_transforms()
-    train_dataset = CaptchaDataset(data_dir=args.data, transform=train_transform, split_name='train', seed=args.seed)
-    val_dataset = CaptchaDataset(data_dir=args.data, transform=eval_transform, split_name='val', seed=args.seed)
-    test_dataset = CaptchaDataset(data_dir=args.data, transform=eval_transform, split_name='test', seed=args.seed)
+    train_dataset = CaptchaDataset(data_dir=variant.data_dir, transform=train_transform, split_name='train', seed=seed)
+    val_dataset = CaptchaDataset(data_dir=variant.data_dir, transform=eval_transform, split_name='val', seed=seed)
+    test_dataset = CaptchaDataset(data_dir=variant.data_dir, transform=eval_transform, split_name='test', seed=seed)
 
     describe_split('train', train_dataset)
     describe_split('val', val_dataset)
@@ -487,15 +532,15 @@ if __name__ == '__main__':
     test_loader = data.DataLoader(test_dataset, batch_size=256, shuffle=False, num_workers=0)
 
     model = Net().to(device)
-    maybe_resume(model, args.resume)
+    maybe_resume(model, variant.resume_path)
 
-    output_dir = Path(args.out)
+    output_dir = Path(variant.output_dir)
     existing_best_checkpoint = load_existing_checkpoint(build_output_paths(output_dir)['best_checkpoint'])
     output_paths = prepare_output_dir(
         output_dir,
-        overwrite_output=args.overwrite,
+        overwrite_output=overwrite_output,
         preserve_paths=[
-            Path(args.resume),
+            Path(variant.resume_path),
             build_output_paths(output_dir)['best_checkpoint'],
             build_output_paths(output_dir)['quantized_checkpoint'],
         ],
@@ -518,10 +563,10 @@ if __name__ == '__main__':
         optimizer,
         device=device,
         scheduler=scheduler,
-        epochs=args.epochs,
+        epochs=epochs,
     )
     if best_state is None:
-        raise RuntimeError('Training did not produce a checkpoint.')
+        raise RuntimeError(f'Training did not produce a checkpoint for variant {variant.name}.')
 
     last_checkpoint = {
         'state_dict': {name: value.detach().cpu() for name, value in model.state_dict().items()},
@@ -569,8 +614,9 @@ if __name__ == '__main__':
             'position_accuracy': test_summary['position_accuracy'],
         },
         'digits': DIGITS,
-        'seed': args.seed,
-        'data_dir': args.data,
+        'seed': seed,
+        'data_dir': variant.data_dir,
+        'variant': variant.name,
     }
     if should_replace_best_checkpoint(
         existing_best_checkpoint,
@@ -594,9 +640,10 @@ if __name__ == '__main__':
         )
 
     summary = {
-        'seed': args.seed,
-        'data_dir': args.data,
-        'resume': args.resume,
+        'variant': variant.name,
+        'seed': seed,
+        'data_dir': variant.data_dir,
+        'resume': variant.resume_path,
         'output_dir': str(output_dir),
         'val_metrics': val_metrics,
         'test_metrics': test_metrics,
@@ -607,3 +654,28 @@ if __name__ == '__main__':
     with output_paths['metrics_summary'].open('w') as fp:
         json.dump(summary, fp, indent=2)
     print(f'Saved metrics summary to {output_paths["metrics_summary"]}')
+    return summary
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    summaries = []
+    for variant in resolve_variant_runs(args):
+        summaries.append(
+            run_training_variant(
+                variant,
+                epochs=args.epochs,
+                seed=args.seed,
+                overwrite_output=args.overwrite,
+            )
+        )
+
+    if len(summaries) > 1:
+        print('== Variant summary ==')
+        for summary in summaries:
+            print(
+                f'{summary["variant"]}: '
+                f'val_seq_acc = {summary["val_metrics"]["sequence_accuracy"]:.6f}, '
+                f'test_seq_acc = {summary["test_metrics"]["sequence_accuracy"]:.6f}, '
+                f'out = {summary["output_dir"]}'
+            )

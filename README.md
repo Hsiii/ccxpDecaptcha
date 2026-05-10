@@ -89,13 +89,18 @@ python -m oauthcaptcha.build --variant clean
 ```
 
 ### 3. Train the OAuth model
-Train and evaluate against the OAuth dataset, writing checkpoints and metrics into `./out/oauthcaptcha`:
+By default, train both raw and cleaned variants:
 ```bash
 python -m oauthcaptcha.train
 ```
-To train against the cleaned dataset instead:
+This writes:
+- raw outputs to `./out/oauthcaptcha`
+- cleaned outputs to `./out/oauthcaptcha_clean`
+
+If you only want one variant:
 ```bash
-python -m oauthcaptcha.train --data data/oauthcaptcha_clean --out out/oauthcaptcha_clean
+python -m oauthcaptcha.train --variant raw
+python -m oauthcaptcha.train --variant clean
 ```
 
 ## License
