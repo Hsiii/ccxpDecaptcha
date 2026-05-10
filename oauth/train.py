@@ -372,7 +372,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--resume', default='out/oauth/last.pt')
     parser.add_argument('--clean-resume', default='out/oauth_clean/last.pt')
-    parser.add_argument('--epochs', type=int, default=30)
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--seed', type=int, default=DEFAULT_SEED)
     parser.add_argument('--data', default='data/oauth')
     parser.add_argument('--clean-data', default='data/oauth_clean')
