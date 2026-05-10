@@ -4,6 +4,8 @@ A training pipeline for NTHU CCXP decaptcha model.
 
 Based on the work by [25349023](https://github.com/25349023), this fork enhances the local training workflow and the model architecture with a new cropped full-image six-head model. The model is retrained from scratch on a new dataset of 600 manually labeled captcha group (30000 images) collected in 2026 April, achieving significantly improved performance of 99.96% six-digit sequence accuracy and 99.99% individual digit accuracy.
 
+The repo also includes a parallel `oauthcaptcha` pipeline for the newer OAuth login captcha observed on `oauth.ccxp.nthu.edu.tw`, which currently uses 4 digits and `captcha_id`-based image grouping.
+
 ## Setup
 
 ```bash
@@ -56,6 +58,32 @@ Outputs:
 - `out/val_cm.npy`
 - `out/test_cm.npy`
 - `out/metrics.json`
+
+## OAuth 4-digit pipeline
+
+The original `decaptcha` package remains the 6-digit CCXP pipeline. The `oauthcaptcha` package is an alternative collector/build/train flow for the OAuth login page captcha.
+
+### 1. Collect OAuth captcha data
+Download from the OAuth authorize page, label once per `captcha_id`, and save repeated renders for the same 4-digit code:
+```bash
+python -m oauthcaptcha.collect
+```
+If you mislabel a captcha group:
+```bash
+python -m oauthcaptcha.relabel
+```
+
+### 2. Build the OAuth dataset arrays
+Build from `./data/oauthcaptcha` and write `images.npy`, `labels.npy`, and `groups.npy` back into that directory:
+```bash
+python -m oauthcaptcha.build
+```
+
+### 3. Train the OAuth model
+Train and evaluate against the OAuth dataset, writing checkpoints and metrics into `./out/oauthcaptcha`:
+```bash
+python -m oauthcaptcha.train
+```
 
 ## License
 
