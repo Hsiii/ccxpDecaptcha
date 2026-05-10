@@ -72,6 +72,7 @@ python -m oauth.collect
 Defaults:
 - `1000` groups
 - `10` rendered variants per group
+- up to `8` persistent PHP workers in parallel
 - output to `./data/oauth`
 
 Requirements:
@@ -80,7 +81,7 @@ Requirements:
 
 Example with explicit sizing:
 ```bash
-python -m oauth.collect --groups 1500 --renders-per-group 12 --seed 42
+python -m oauth.collect --groups 1500 --renders-per-group 12 --workers 4 --seed 42
 ```
 
 ### 2. Build the OAuth dataset arrays
