@@ -4,7 +4,7 @@ A training pipeline for NTHU CCXP captcha models.
 
 Based on the work by [25349023](https://github.com/25349023), this fork enhances the local training workflow and the model architecture with a new cropped full-image six-head model. The model is retrained from scratch on a new dataset of 600 manually labeled captcha group (30000 images) collected in 2026 April, achieving significantly improved performance of 99.96% six-digit sequence accuracy and 99.99% individual digit accuracy.
 
-The repo also includes a parallel `oauth` pipeline for the newer OAuth login captcha observed on `oauth.ccxp.nthu.edu.tw`, which currently uses 4 digits and `captcha_id`-based image grouping.
+The repo also includes a parallel `oauth` pipeline for the newer OAuth login captcha observed on `oauth.ccxp.nthu.edu.tw`, which currently uses 4 digits and can be trained from synthetic images based on the observed Securimage configuration.
 
 ## Setup
 
@@ -63,16 +63,25 @@ Outputs:
 
 The original `ccxp` package remains the 6-digit CCXP pipeline. The `oauth` package is an alternative collector/build/train flow for the OAuth login page captcha.
 
-### 1. Collect OAuth captcha data
-Download from the OAuth authorize page and label one image at a time:
+### 1. Generate OAuth captcha data
+Generate synthetic captcha groups using the observed Securimage-style settings:
 ```bash
 python -m oauth.collect
 ```
-If you mislabel a captcha group:
+Defaults:
+- `1000` groups
+- `10` rendered variants per group
+- output to `./data/oauth`
+
+Example with explicit sizing:
+```bash
+python -m oauth.collect --groups 1500 --renders-per-group 12 --seed 42
+```
+
+If you need to rename a generated label:
 ```bash
 python -m oauth.relabel
 ```
-Do not reuse repeated fetches from the same `captchaimg.php?id=...` URL. On this OAuth host they do not preserve a stable answer, so OAuth collection stores exactly one labeled image per captcha.
 
 ### 2. Build the OAuth dataset arrays
 Build raw and cleaned variants from `./data/oauth`:

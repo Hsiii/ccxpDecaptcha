@@ -1,134 +1,191 @@
-import io
+import argparse
+import math
+import random
+import time
 from pathlib import Path
-from typing import Tuple
 
-import requests
-import urllib3
-from PIL import Image
-from bs4 import BeautifulSoup
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 try:
     from .paths import resolve_repo_path
 except ImportError:
     from paths import resolve_repo_path
 
-AUTHORIZE_URL = (
-    'https://oauth.ccxp.nthu.edu.tw/v1.1/authorize.php'
-    '?response_type=code'
-    '&client_id=eeclass'
-    '&redirect_uri=https%3A%2F%2Feeclass.nthu.edu.tw%2Fservice%2Foauth%2F'
-    '&scope=lmsid+userid'
-    '&state='
-    '&ui_locales=zh-TW'
+# Mirrors the observed Securimage settings from the target OAuth deployment.
+CHARSET = '0123456789'
+IMAGE_WIDTH = 150
+IMAGE_HEIGHT = 80
+CODE_LENGTH = 4
+NUM_LINES = 5
+PERTURBATION = 0.80
+TEXT_GRAY = 112
+BACKGROUND_GRAY = 255
+NOISE_GRAY = 112
+
+FONT_CANDIDATES = (
+    'DejaVuSans-Bold.ttf',
+    '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
+    '/System/Library/Fonts/Supplemental/Arial.ttf',
 )
-CAPTCHA_BASE_URL = 'https://oauth.ccxp.nthu.edu.tw/v1.1/'
 
 
-def build_oauth_session() -> requests.Session:
-    session = requests.Session()
-    # The OAuth captcha host currently presents a certificate chain that
-    # Python 3.14 rejects, so collection opts into site-scoped insecure TLS.
-    session.verify = False
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    return session
+def resolve_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    for candidate in FONT_CANDIDATES:
+        try:
+            return ImageFont.truetype(candidate, font_size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
 
 
-def get_captcha(session: requests.Session) -> Tuple[str, str]:
-    res = session.get(AUTHORIZE_URL, timeout=20)
-    res.raise_for_status()
-    soup = BeautifulSoup(res.text, 'lxml')
-    captcha_input = soup.select_one('input[name="captcha_id"]')
-    captcha_image = soup.select_one('#captcha_image')
-    if captcha_input is None or captcha_image is None:
-        raise ValueError('Unable to find captcha metadata on the OAuth login page.')
-    captcha_id = captcha_input.get('value', '').strip()
-    captcha_src = captcha_image.get('src', '').strip()
-    if not captcha_id or not captcha_src:
-        raise ValueError('Captcha metadata is empty on the OAuth login page.')
-    return captcha_id, captcha_src
+def random_code(rng: random.Random) -> str:
+    return ''.join(rng.choice(CHARSET) for _ in range(CODE_LENGTH))
 
 
-def count_solved_captchas(save_dir: Path) -> int:
-    solved = {
-        path.stem.split('__', maxsplit=1)[0]
-        for path in save_dir.glob('*.png')
-        if '__' in path.stem
-    }
-    return len(solved)
+def group_id(index: int) -> str:
+    return f'synth-{index:08d}'
 
 
-def render_image_in_terminal(content: bytes):
-    with Image.open(io.BytesIO(content)) as image:
-        rgb_image = image.convert('RGB')
-        width, height = rgb_image.size
-        scale = max(1, 180 // width)
-        resized = rgb_image.resize((width * scale, height * scale), Image.Resampling.NEAREST)
-        pixels = resized.load()
+def render_digit_layer(
+    digit: str,
+    digit_index: int,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    rng: random.Random,
+) -> Image.Image:
+    canvas = Image.new('L', (IMAGE_WIDTH, IMAGE_HEIGHT), 0)
+    draw = ImageDraw.Draw(canvas)
+    bbox = draw.textbbox((0, 0), digit, font=font)
+    glyph_width = bbox[2] - bbox[0]
+    glyph_height = bbox[3] - bbox[1]
 
-        print('\x1b[2J\x1b[H', end='')
-        print()
-        for y in range(0, resized.height - 1, 2):
-            row = []
-            for x in range(resized.width):
-                top = pixels[x, y]
-                bottom = pixels[x, y + 1]
-                row.append(
-                    f'\x1b[38;2;{top[0]};{top[1]};{top[2]}m'
-                    f'\x1b[48;2;{bottom[0]};{bottom[1]};{bottom[2]}m▀'
-                )
-            row.append('\x1b[0m')
-            print(''.join(row))
-        if resized.height % 2 == 1:
-            row = []
-            y = resized.height - 1
-            for x in range(resized.width):
-                top = pixels[x, y]
-                row.append(f'\x1b[38;2;{top[0]};{top[1]};{top[2]}m▀')
-            row.append('\x1b[0m')
-            print(''.join(row))
-        print()
+    base_x = 10 + digit_index * 29 + rng.randint(-6, 6)
+    base_y = 10 + rng.randint(-5, 5)
+    draw.text(
+        (base_x - bbox[0], base_y - bbox[1]),
+        digit,
+        font=font,
+        fill=255,
+        stroke_width=rng.randint(0, 1),
+        stroke_fill=255,
+    )
 
+    crop_left = max(0, base_x - 10)
+    crop_top = max(0, base_y - 10)
+    crop_right = min(IMAGE_WIDTH, base_x + glyph_width + 14)
+    crop_bottom = min(IMAGE_HEIGHT, base_y + glyph_height + 14)
+    glyph = canvas.crop((crop_left, crop_top, crop_right, crop_bottom))
 
-def show_image(content: bytes):
-    render_image_in_terminal(content)
+    rotate = rng.uniform(-26, 26)
+    glyph = glyph.rotate(rotate, resample=Image.Resampling.BICUBIC, expand=True, fillcolor=0)
 
+    shear = rng.uniform(-0.28, 0.28)
+    width, height = glyph.size
+    offset = int(abs(shear) * height)
+    sheared_width = width + offset
+    glyph = glyph.transform(
+        (sheared_width, height),
+        Image.Transform.AFFINE,
+        (1, shear, -offset if shear > 0 else 0, 0, 1, 0),
+        resample=Image.Resampling.BICUBIC,
+        fillcolor=0,
+    )
 
-def manually_label(captcha_src: str, captcha_id: str, session: requests.Session, solved_count: int) -> Tuple[str, str]:
-    res = session.get(CAPTCHA_BASE_URL + captcha_src, timeout=20)
-    res.raise_for_status()
-    show_image(res.content)
-    label = input(f'({solved_count} solved) solve the 4-digit captcha: ').strip()
-    if len(label) != 4 or not label.isdigit():
-        raise ValueError(f'Expected a 4-digit label, got {label!r}')
-    return label, captcha_id
-
-
-def collect_one(save_dir: Path, generate_count: int, session: requests.Session):
-    captcha_id, captcha_src = get_captcha(session)
-    solved_count = count_solved_captchas(save_dir)
-    file_prefix, group = manually_label(captcha_src, captcha_id, session, solved_count)
-
-    for i in range(generate_count):
-        if i > 0:
-            raise ValueError(
-                'OAuth captcha collection only supports one labeled render per captcha. '
-                'Repeated requests to the same captcha endpoint do not preserve the same answer.'
-            )
-        res = session.get(CAPTCHA_BASE_URL + captcha_src, timeout=20)
-        res.raise_for_status()
-        with open(save_dir / f'{group}__{file_prefix}_{i}.png', 'wb') as f:
-            f.write(res.content)
+    layer = Image.new('L', (IMAGE_WIDTH, IMAGE_HEIGHT), 0)
+    paste_x = min(max(0, base_x + rng.randint(-4, 4)), max(0, IMAGE_WIDTH - glyph.size[0]))
+    paste_y = min(max(0, base_y + rng.randint(-3, 3)), max(0, IMAGE_HEIGHT - glyph.size[1]))
+    layer.paste(glyph, (paste_x, paste_y), glyph)
+    return layer
 
 
-def collect_many(save_dir: Path, n_round: int, cnt_per_round: int):
-    sess = build_oauth_session()
-    for _ in range(n_round):
-        collect_one(save_dir, cnt_per_round, sess)
+def apply_wave_distortion(mask: np.ndarray, rng: random.Random) -> np.ndarray:
+    height, width = mask.shape
+    yy, xx = np.indices((height, width), dtype=np.float32)
+
+    amp_x = PERTURBATION * rng.uniform(1.5, 3.2)
+    amp_y = PERTURBATION * rng.uniform(1.0, 2.6)
+    freq_x = rng.uniform(0.055, 0.095)
+    freq_y = rng.uniform(0.04, 0.085)
+    phase_x = rng.uniform(0, math.tau)
+    phase_y = rng.uniform(0, math.tau)
+
+    src_x = xx + amp_x * np.sin(freq_x * yy + phase_x)
+    src_y = yy + amp_y * np.sin(freq_y * xx + phase_y)
+
+    src_x = np.clip(np.rint(src_x).astype(np.int32), 0, width - 1)
+    src_y = np.clip(np.rint(src_y).astype(np.int32), 0, height - 1)
+    return mask[src_y, src_x]
+
+
+def draw_noise(image: Image.Image, rng: random.Random) -> None:
+    draw = ImageDraw.Draw(image)
+
+    for _ in range(NUM_LINES):
+        points = []
+        y = rng.randint(0, IMAGE_HEIGHT - 1)
+        slope = rng.uniform(-0.35, 0.35)
+        for x in range(-20, IMAGE_WIDTH + 21, 12):
+            y += rng.randint(-8, 8)
+            points.append((x, int(y + slope * x)))
+        draw.line(points, fill=NOISE_GRAY, width=rng.randint(2, 4))
+
+    for _ in range(rng.randint(60, 110)):
+        x = rng.randint(0, IMAGE_WIDTH - 1)
+        y = rng.randint(0, IMAGE_HEIGHT - 1)
+        shape = rng.choice(('dot', 'plus', 'corner'))
+        if shape == 'dot':
+            draw.rectangle((x, y, x + 1, y + 1), fill=NOISE_GRAY)
+        elif shape == 'plus':
+            draw.line((x - 1, y, x + 1, y), fill=NOISE_GRAY, width=1)
+            draw.line((x, y - 1, x, y + 1), fill=NOISE_GRAY, width=1)
+        else:
+            size = rng.randint(1, 2)
+            draw.line((x, y, x + size, y), fill=NOISE_GRAY, width=1)
+            draw.line((x, y, x, y + size), fill=NOISE_GRAY, width=1)
+
+
+def render_captcha(code: str, rng: random.Random) -> np.ndarray:
+    font = resolve_font(rng.randint(48, 58))
+    layers = [render_digit_layer(digit, idx, font, rng) for idx, digit in enumerate(code)]
+    mask = np.maximum.reduce([np.asarray(layer, dtype=np.uint8) for layer in layers])
+    mask = apply_wave_distortion(mask, rng)
+
+    image = Image.new('L', (IMAGE_WIDTH, IMAGE_HEIGHT), BACKGROUND_GRAY)
+    image_np = np.asarray(image, dtype=np.uint8).copy()
+    image_np[mask > 32] = TEXT_GRAY
+    image = Image.fromarray(image_np, mode='L')
+    draw_noise(image, rng)
+    rgb = np.asarray(image.convert('RGB'), dtype=np.uint8)
+    return rgb
+
+
+def collect_many(save_dir: Path, groups: int, renders_per_group: int, seed: int | None) -> None:
+    rng = random.Random(seed if seed is not None else int(time.time() * 1000))
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    for group_index in range(groups):
+        code = random_code(rng)
+        group = group_id(group_index)
+        for render_index in range(renders_per_group):
+            image = render_captcha(code, rng)
+            path = save_dir / f'{group}__{code}_{render_index}.png'
+            Image.fromarray(image).save(path)
+
+        if (group_index + 1) % 100 == 0:
+            print(f'{group_index + 1} groups generated.')
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Generate synthetic OAuth captcha images using observed Securimage settings.')
+    parser.add_argument('--out', default='data/oauth', help='Directory to write generated PNG files.')
+    parser.add_argument('--groups', type=int, default=1000, help='Number of unique captcha codes to generate.')
+    parser.add_argument('--renders-per-group', type=int, default=10, help='Number of rendered variants per code.')
+    parser.add_argument('--seed', type=int, default=None, help='Optional random seed for reproducible generation.')
+    args = parser.parse_args()
+    args.out = str(resolve_repo_path(args.out))
+    return args
 
 
 if __name__ == '__main__':
-    dire = resolve_repo_path('data/oauth')
-    if not dire.exists():
-        dire.mkdir(parents=True)
-
-    collect_many(dire, 2500, 1)
+    args = parse_args()
+    collect_many(Path(args.out), groups=args.groups, renders_per_group=args.renders_per_group, seed=args.seed)
