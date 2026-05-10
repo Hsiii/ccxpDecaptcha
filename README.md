@@ -85,36 +85,22 @@ python -m oauth.collect --groups 1500 --renders-per-group 12 --workers 4 --seed 
 ```
 
 ### 2. Build the OAuth dataset arrays
-Build raw and cleaned variants from `./data/oauth`:
+Build the raw OAuth dataset from `./data/oauth`:
 ```bash
 python -m oauth.build
 ```
 This writes:
-- raw arrays to `./data/oauth`
-- cleaned arrays to `./data/oauth_clean`
-
-If you only want one variant:
-```bash
-python -m oauth.build --variant raw
-python -m oauth.build --variant clean
-```
+- arrays to `./data/oauth`
 
 ### 3. Train the OAuth model
-By default, train both raw and cleaned variants:
+Train the OAuth model:
 ```bash
 python -m oauth.train
 ```
 OAuth training now early-stops on validation loss after `3` stale epochs by default.
 
 This writes:
-- raw outputs to `./out/oauth`
-- cleaned outputs to `./out/oauth_clean`
-
-If you only want one variant:
-```bash
-python -m oauth.train --variant raw
-python -m oauth.train --variant clean
-```
+- outputs to `./out/oauth`
 
 ## License
 
