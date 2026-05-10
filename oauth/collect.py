@@ -54,21 +54,40 @@ def render_captcha(code: str) -> bytes:
     return result.stdout
 
 
+def render_group(save_dir: Path, code: str, group: str, renders_per_group: int) -> None:
+    result = subprocess.run(
+        [PHP_BIN, str(RENDER_SCRIPT), code, str(renders_per_group), str(save_dir), f'{group}__{code}'],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    files = [Path(line.strip()) for line in result.stdout.splitlines() if line.strip()]
+    if len(files) != renders_per_group:
+        raise RuntimeError(f'Renderer wrote {len(files)} files, expected {renders_per_group}.')
+    for path in files:
+        width, height = png_size(path.read_bytes())
+        if width != IMAGE_WIDTH or height != IMAGE_HEIGHT:
+            raise ValueError(
+                f'Rendered captcha size was {width}x{height}, expected {IMAGE_WIDTH}x{IMAGE_HEIGHT}.'
+            )
+
+
 def collect_many(save_dir: Path, groups: int, renders_per_group: int, seed: int | None) -> None:
     assert_renderer_ready()
     rng = random.Random(seed if seed is not None else int(time.time() * 1000))
     save_dir.mkdir(parents=True, exist_ok=True)
+    started = time.time()
 
     for group_index in range(groups):
         code = random_code(rng)
         group = group_id(group_index)
-        for render_index in range(renders_per_group):
-            image = render_captcha(code)
-            path = save_dir / f'{group}__{code}_{render_index}.png'
-            path.write_bytes(image)
+        render_group(save_dir, code, group, renders_per_group)
 
-        if (group_index + 1) % 100 == 0:
-            print(f'{group_index + 1} groups generated.')
+        completed = group_index + 1
+        if completed <= 5 or completed % 25 == 0 or completed == groups:
+            elapsed = time.time() - started
+            rate = completed / elapsed if elapsed else 0.0
+            print(f'{completed}/{groups} groups generated ({rate:.2f} groups/s).')
 
 
 def parse_args():
