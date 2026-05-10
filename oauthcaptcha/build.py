@@ -7,8 +7,10 @@ from PIL import Image
 
 try:
     from .paths import resolve_repo_path
+    from .preprocess import preprocess_oauth_captcha
 except ImportError:
     from paths import resolve_repo_path
+    from preprocess import preprocess_oauth_captcha
 
 def parse_metadata(path: pathlib.Path) -> Tuple[str, str]:
     stem = path.stem
@@ -29,14 +31,17 @@ def load_image(path: pathlib.Path) -> np.ndarray:
         return np.asarray(image.convert('RGB'), dtype=np.uint8)
 
 
-def build_arrays(src: pathlib.Path, out_dir: pathlib.Path):
+def build_arrays(src: pathlib.Path, out_dir: pathlib.Path, preprocess: bool = False):
     images = []
     labels = []
     groups = []
 
     for count, path in enumerate(sorted(src.glob('*.png')), start=1):
         label, group = parse_metadata(path)
-        images.append(load_image(path))
+        image = load_image(path)
+        if preprocess:
+            image = preprocess_oauth_captcha(image)
+        images.append(image)
         labels.append([int(digit) for digit in label])
         groups.append(group)
 
@@ -67,9 +72,21 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--src', default='data/oauthcaptcha')
     parser.add_argument('--out', default='data/oauthcaptcha')
+    parser.add_argument(
+        '--variant',
+        choices=('raw', 'clean', 'both'),
+        default='both',
+        help='Which dataset variant to build.',
+    )
+    parser.add_argument(
+        '--clean-out',
+        default='data/oauthcaptcha_clean',
+        help='Output directory for the cleaned dataset when using --variant clean or both.',
+    )
     args = parser.parse_args()
     args.src = str(resolve_repo_path(args.src))
     args.out = str(resolve_repo_path(args.out))
+    args.clean_out = str(resolve_repo_path(args.clean_out))
     return args
 
 
@@ -80,4 +97,7 @@ if __name__ == '__main__':
     if not src_dir.exists():
         raise OSError(f'Source directory {src_dir} not found.')
 
-    build_arrays(src_dir, pathlib.Path(args.out))
+    if args.variant in ('raw', 'both'):
+        build_arrays(src_dir, pathlib.Path(args.out), preprocess=False)
+    if args.variant in ('clean', 'both'):
+        build_arrays(src_dir, pathlib.Path(args.clean_out), preprocess=True)

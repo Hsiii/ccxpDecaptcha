@@ -74,15 +74,28 @@ python -m oauthcaptcha.relabel
 ```
 
 ### 2. Build the OAuth dataset arrays
-Build from `./data/oauthcaptcha` and write `images.npy`, `labels.npy`, and `groups.npy` back into that directory:
+Build raw and cleaned variants from `./data/oauthcaptcha`:
 ```bash
 python -m oauthcaptcha.build
+```
+This writes:
+- raw arrays to `./data/oauthcaptcha`
+- cleaned arrays to `./data/oauthcaptcha_clean`
+
+If you only want one variant:
+```bash
+python -m oauthcaptcha.build --variant raw
+python -m oauthcaptcha.build --variant clean
 ```
 
 ### 3. Train the OAuth model
 Train and evaluate against the OAuth dataset, writing checkpoints and metrics into `./out/oauthcaptcha`:
 ```bash
 python -m oauthcaptcha.train
+```
+To train against the cleaned dataset instead:
+```bash
+python -m oauthcaptcha.train --data data/oauthcaptcha_clean --out out/oauthcaptcha_clean
 ```
 
 ## License
