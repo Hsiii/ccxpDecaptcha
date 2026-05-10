@@ -86,8 +86,8 @@ def build_arrays(src: pathlib.Path, out_dir: pathlib.Path, preprocess: bool = Fa
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--src', default='data/oauthcaptcha')
-    parser.add_argument('--out', default='data/oauthcaptcha')
+    parser.add_argument('--src', default='data/oauth')
+    parser.add_argument('--out', default='data/oauth')
     parser.add_argument(
         '--variant',
         choices=('raw', 'clean', 'both'),
@@ -96,7 +96,7 @@ def parse_args():
     )
     parser.add_argument(
         '--clean-out',
-        default='data/oauthcaptcha_clean',
+        default='data/oauth_clean',
         help='Output directory for the cleaned dataset when using --variant clean or both.',
     )
     args = parser.parse_args()

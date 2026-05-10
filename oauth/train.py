@@ -370,14 +370,14 @@ def export_quantized_model(model: nn.Module, output_path: str):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--resume', default='out/oauthcaptcha/last.pt')
-    parser.add_argument('--clean-resume', default='out/oauthcaptcha_clean/last.pt')
+    parser.add_argument('--resume', default='out/oauth/last.pt')
+    parser.add_argument('--clean-resume', default='out/oauth_clean/last.pt')
     parser.add_argument('--epochs', type=int, default=30)
     parser.add_argument('--seed', type=int, default=DEFAULT_SEED)
-    parser.add_argument('--data', default='data/oauthcaptcha')
-    parser.add_argument('--clean-data', default='data/oauthcaptcha_clean')
-    parser.add_argument('--out', default='out/oauthcaptcha')
-    parser.add_argument('--clean-out', default='out/oauthcaptcha_clean')
+    parser.add_argument('--data', default='data/oauth')
+    parser.add_argument('--clean-data', default='data/oauth_clean')
+    parser.add_argument('--out', default='out/oauth')
+    parser.add_argument('--clean-out', default='out/oauth_clean')
     parser.add_argument(
         '--variant',
         choices=('raw', 'clean', 'all'),

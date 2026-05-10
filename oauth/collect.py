@@ -127,7 +127,7 @@ def collect_many(save_dir: Path, n_round: int, cnt_per_round: int):
 
 
 if __name__ == '__main__':
-    dire = resolve_repo_path('data/oauthcaptcha')
+    dire = resolve_repo_path('data/oauth')
     if not dire.exists():
         dire.mkdir(parents=True)
 
