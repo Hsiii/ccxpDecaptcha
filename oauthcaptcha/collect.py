@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Tuple
 
 import requests
+import urllib3
 from PIL import Image
 from bs4 import BeautifulSoup
 
@@ -24,7 +25,12 @@ CAPTCHA_BASE_URL = 'https://oauth.ccxp.nthu.edu.tw/v1.1/'
 
 
 def build_oauth_session() -> requests.Session:
-    return requests.Session()
+    session = requests.Session()
+    # The OAuth captcha host currently presents a certificate chain that
+    # Python 3.14 rejects, so collection opts into site-scoped insecure TLS.
+    session.verify = False
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    return session
 
 
 def get_captcha(session: requests.Session) -> Tuple[str, str]:
