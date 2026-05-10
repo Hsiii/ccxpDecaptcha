@@ -1,5 +1,6 @@
 import argparse
 import pathlib
+from collections import Counter
 from typing import Tuple
 
 import numpy as np
@@ -31,6 +32,19 @@ def load_image(path: pathlib.Path) -> np.ndarray:
         return np.asarray(image.convert('RGB'), dtype=np.uint8)
 
 
+def validate_group_counts(groups) -> None:
+    counts = Counter(groups)
+    repeated = {group: count for group, count in counts.items() if count > 1}
+    if not repeated:
+        return
+    sample = ', '.join(f'{group}:{count}' for group, count in list(sorted(repeated.items()))[:5])
+    raise ValueError(
+        'OAuth captcha dataset contains repeated renders for the same group, which is unsupported because '
+        'this captcha endpoint does not keep a stable answer across repeated fetches. '
+        f'Example repeated groups: {sample}'
+    )
+
+
 def build_arrays(src: pathlib.Path, out_dir: pathlib.Path, preprocess: bool = False):
     images = []
     labels = []
@@ -50,6 +64,8 @@ def build_arrays(src: pathlib.Path, out_dir: pathlib.Path, preprocess: bool = Fa
 
     if not images:
         raise RuntimeError(f'No PNG files found in {src}')
+
+    validate_group_counts(groups)
 
     image_array = np.stack(images, axis=0)
     label_array = np.array(labels, dtype=np.int64)

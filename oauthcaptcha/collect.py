@@ -109,6 +109,11 @@ def collect_one(save_dir: Path, generate_count: int, session: requests.Session):
     file_prefix, group = manually_label(captcha_src, captcha_id, session, solved_count)
 
     for i in range(generate_count):
+        if i > 0:
+            raise ValueError(
+                'OAuth captcha collection only supports one labeled render per captcha. '
+                'Repeated requests to the same captcha endpoint do not preserve the same answer.'
+            )
         res = session.get(CAPTCHA_BASE_URL + captcha_src, timeout=20)
         res.raise_for_status()
         with open(save_dir / f'{group}__{file_prefix}_{i}.png', 'wb') as f:
@@ -126,4 +131,4 @@ if __name__ == '__main__':
     if not dire.exists():
         dire.mkdir(parents=True)
 
-    collect_many(dire, 50, 50)
+    collect_many(dire, 2500, 1)

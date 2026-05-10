@@ -64,7 +64,7 @@ Outputs:
 The original `decaptcha` package remains the 6-digit CCXP pipeline. The `oauthcaptcha` package is an alternative collector/build/train flow for the OAuth login page captcha.
 
 ### 1. Collect OAuth captcha data
-Download from the OAuth authorize page, label once per `captcha_id`, and save repeated renders for the same 4-digit code:
+Download from the OAuth authorize page and label one image at a time:
 ```bash
 python -m oauthcaptcha.collect
 ```
@@ -72,6 +72,7 @@ If you mislabel a captcha group:
 ```bash
 python -m oauthcaptcha.relabel
 ```
+Do not reuse repeated fetches from the same `captchaimg.php?id=...` URL. On this OAuth host they do not preserve a stable answer, so OAuth collection stores exactly one labeled image per captcha.
 
 ### 2. Build the OAuth dataset arrays
 Build raw and cleaned variants from `./data/oauthcaptcha`:
