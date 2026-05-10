@@ -4,7 +4,7 @@ A training pipeline for NTHU CCXP captcha models.
 
 Based on the work by [25349023](https://github.com/25349023), this fork enhances the local training workflow and the model architecture with a new cropped full-image six-head model. The model is retrained from scratch on a new dataset of 600 manually labeled captcha group (30000 images) collected in 2026 April, achieving significantly improved performance of 99.96% six-digit sequence accuracy and 99.99% individual digit accuracy.
 
-The repo also includes a parallel `oauth` pipeline for the newer OAuth login captcha observed on `oauth.ccxp.nthu.edu.tw`, which currently uses 4 digits and can be trained from synthetic images based on the observed Securimage configuration.
+The repo also includes a parallel `oauth` pipeline for the newer OAuth login captcha observed on `oauth.ccxp.nthu.edu.tw`, which currently uses 4 digits and is generated locally with the real Securimage PHP library using the observed site settings.
 
 ## Setup
 
@@ -13,6 +13,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
+composer install
 ```
 
 ## Workflow
@@ -64,7 +65,7 @@ Outputs:
 The original `ccxp` package remains the 6-digit CCXP pipeline. The `oauth` package is an alternative collector/build/train flow for the OAuth login page captcha.
 
 ### 1. Generate OAuth captcha data
-Generate synthetic captcha groups using the observed Securimage-style settings. Output images match the site size exactly at `150x80`:
+Generate OAuth captcha groups with a local Securimage renderer. Output images match the site size exactly at `150x80`:
 ```bash
 python -m oauth.collect
 ```
@@ -72,6 +73,10 @@ Defaults:
 - `1000` groups
 - `10` rendered variants per group
 - output to `./data/oauth`
+
+Requirements:
+- `php` with the `gd` extension available at `/opt/homebrew/bin/php`
+- Composer dependencies installed via `composer install`
 
 Example with explicit sizing:
 ```bash

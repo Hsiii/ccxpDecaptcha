@@ -16,6 +16,7 @@ out/*
 # Python cache and local tooling noise
 __pycache__/
 *.py[cod]
+vendor/
 
 # Training artifacts
 *.pt
