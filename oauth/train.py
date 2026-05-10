@@ -27,7 +27,7 @@ except ImportError:
 
 DEFAULT_SEED = None
 MAX_TRAIN_RENDERS_PER_GROUP = 20
-EARLY_STOPPING_PATIENCE = 8
+EARLY_STOPPING_PATIENCE = 3
 LR_PLATEAU_PATIENCE = 3
 
 
@@ -302,6 +302,7 @@ def describe_split(name: str, dataset: CaptchaDataset):
 def fit(model, train_ld, val_ld, loss_fn, optim, device: torch.device, scheduler=None, epochs=20):
     best_state = None
     best_sequence_accuracy = -1.0
+    best_val_loss = float('inf')
     epochs_without_improvement = 0
 
     for epoch in range(epochs):
@@ -323,6 +324,9 @@ def fit(model, train_ld, val_ld, loss_fn, optim, device: torch.device, scheduler
         if val_metrics['sequence_accuracy'] > best_sequence_accuracy:
             best_sequence_accuracy = val_metrics['sequence_accuracy']
             best_state = {name: value.detach().cpu().clone() for name, value in model.state_dict().items()}
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
             epochs_without_improvement = 0
         else:
             epochs_without_improvement += 1

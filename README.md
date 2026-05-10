@@ -104,6 +104,8 @@ By default, train both raw and cleaned variants:
 ```bash
 python -m oauth.train
 ```
+OAuth training now early-stops on validation loss after `3` stale epochs by default.
+
 This writes:
 - raw outputs to `./out/oauth`
 - cleaned outputs to `./out/oauth_clean`
