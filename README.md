@@ -25,41 +25,41 @@ composer install # for Securimage PHP in the oauth pipeline
 
 CCXP:
 ```bash
-python -m ccxp.collect
+python -m pipelines.ccxp.collect
 ```
 
 OAuth:
 ```bash
-python -m oauth.collect
+python -m pipelines.oauth.collect
 ```
 
 To relabel the last CCXP sample:
 ```bash
-python -m ccxp.relabel
+python -m pipelines.ccxp.relabel
 ```
 
 ### 2. Build dataset arrays
 
 CCXP:
 ```bash
-python -m ccxp.build
+python -m pipelines.ccxp.build
 ```
 
 OAuth:
 ```bash
-python -m oauth.build
+python -m pipelines.oauth.build
 ```
 
 ### 3. Train and evaluate
 
 CCXP:
 ```bash
-python -m ccxp.train
+python -m pipelines.ccxp.train
 ```
 
 OAuth:
 ```bash
-python -m oauth.train
+python -m pipelines.oauth.train
 ```
 
 Model checkpoints are saved to `best.pt`.
