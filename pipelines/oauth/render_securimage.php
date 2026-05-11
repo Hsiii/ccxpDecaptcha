@@ -9,7 +9,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../vendor/dapphp/securimage/securimage.php';
 
 if ($argc < 2) {
-    fwrite(STDERR, "Usage: php oauth/render_securimage.php <code> [count [outdir [prefix]]]\n");
+    fwrite(STDERR, "Usage: php pipelines/oauth/render_securimage.php <code> [count [outdir [prefix]]]\n");
     exit(1);
 }
 

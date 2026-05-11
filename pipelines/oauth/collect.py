@@ -19,7 +19,7 @@ IMAGE_WIDTH = 150
 IMAGE_HEIGHT = 80
 CODE_LENGTH = 4
 PHP_BIN = '/opt/homebrew/bin/php'
-WORKER_SCRIPT = resolve_repo_path('oauth/render_securimage_worker.php')
+WORKER_SCRIPT = resolve_repo_path('pipelines/oauth/render_securimage_worker.php')
 
 
 def random_code(rng: random.Random) -> str:
