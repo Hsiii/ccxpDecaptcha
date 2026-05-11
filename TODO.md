@@ -1,0 +1,23 @@
+# TODO
+
+- [ ] Symmetricalize both pipelines around a shared directory layout:
+  - `data/<pipeline>/raw`
+  - `data/<pipeline>/processed`
+  - `out/<pipeline>/checkpoints`
+  - `out/<pipeline>/eval`
+- [ ] Normalize artifact names across both pipelines:
+  - `images.npy`
+  - `labels.npy`
+  - `groups.npy`
+  - `best.pt`
+  - `last.pt`
+  - `int8.pt`
+  - `metrics.json`
+  - `val.csv`
+  - `test.csv`
+  - `val_cm.npy`
+  - `test_cm.npy`
+- [ ] Add a shared config layer so each pipeline keeps distinct defaults without hardcoded path divergence.
+- [ ] Extract shared path/output conventions and reduce duplication between `ccxp` and `oauth`.
+- [ ] Remove `oauth_clean` related code and directory conventions completely.
+- [ ] Commit the refactor in increasing, atomic chunks.
