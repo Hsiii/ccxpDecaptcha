@@ -1,11 +1,5 @@
-from pathlib import Path
+from pipeline_config import PIPELINES, REPO_ROOT, PipelineConfig, resolve_repo_path
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+PIPELINE: PipelineConfig = PIPELINES['oauth']
 
-
-def resolve_repo_path(path_str: str) -> Path:
-    path = Path(path_str).expanduser()
-    if path.is_absolute():
-        return path
-    return REPO_ROOT / path
