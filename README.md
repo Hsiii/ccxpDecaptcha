@@ -1,48 +1,72 @@
 # ccxpDecaptcha
 
-A training pipeline for NTHU CCXP decaptcha models.
+A training pipeline for NTHU CCXP & CCXP OAuth decaptcha models.
 
-Based on the work by [25349023](https://github.com/25349023), this fork enhances the local training workflow and the model architecture with a new cropped full-image six-head model. The model is retrained from scratch on a new dataset of 600 manually labeled captcha group (30000 images) collected in 2026 April, achieving significantly improved performance of 99.96% six-digit sequence accuracy and 99.99% individual digit accuracy.
+|NTHU CCXP login captcha|NTHU CCXP OAuth captcha|
+|---|---|
+|<img width="186" height="320" alt="image" src="https://github.com/user-attachments/assets/677ae39c-89c4-49bd-8e4b-89eb49db3ac3" />|<img width="210" height="320" alt="image" src="https://github.com/user-attachments/assets/a31535ea-5ea4-4909-a8fd-4603f7e887b7" />|
 
-The repo also adds a parallel pipeline for the NTHU OAuth login decaptcha with a 4-attention-pooling-heads model, achieving 98.79% four-digit sequence accuracy and 99.69% individual digit accuracy on a dataset of 23000 images collected with Securimage PHP in 2026 May.
+
+Based on [nthu-ccxp-captcha](https://github.com/25349023/nthu-ccxp-captcha)'s training pipeline, this project:
+- Rebuilt the original multi-window labeling workflow into a fully terminal-based labeling pipeline for faster manual data collection.
+- Introduced a new six-head model architecture trained from scratch on a dataset of 30,000 images manually labeled in April 2026, achieving 99.96% six-digit sequence accuracy and 99.99% per-digit accuracy.
+- Added a NTHU CCXP OAuth login decaptcha training pipeline with a 4-head attention-pooling model, achieving 98.79% four-digit sequence accuracy and 99.69% per-digit accuracy on a dataset of 23,000 Securimage PHP captcha images in May 2026.
 
 ## Setup
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
 pip install -r requirements.txt
 composer install # for Securimage PHP in the oauth pipeline
 ```
 
-## Workflow
-Fill in `<mode>` with either `ccxp` or `oauth` to run the respective pipeline.
+## Pipelines
+
 ### 1. Collect captcha data
-- `<mode>` = `ccxp`: Fetch captcha images and render in terminal for manual labeling
-- `<mode>` = `oauth`: Use Securimage PHP to generate captcha images + labels
+
+CCXP:
 ```bash
-python -m <mode>.collect
+python -m ccxp.collect
 ```
-If you mislabel a captcha in `ccxp` mode:
+
+OAuth:
+```bash
+python -m oauth.collect
+```
+
+To relabel the last CCXP sample:
 ```bash
 python -m ccxp.relabel
 ```
 
-### 2. Build the dataset arrays
+### 2. Build dataset arrays
+
+CCXP:
 ```bash
-python -m <mode>.build
+python -m ccxp.build
+```
+
+OAuth:
+```bash
+python -m oauth.build
 ```
 
 ### 3. Train and evaluate
-Train the model and evaluate on the test set, with model checkpoints saved in `best.pt`:
+
+CCXP:
 ```bash
-python -m <mode>.train
+python -m ccxp.train
 ```
+
+OAuth:
+```bash
+python -m oauth.train
+```
+
+Model checkpoints are saved to `best.pt`.
 
 ## License
 
 This project is released under the MIT License.
 
-- Original forked work remains attributed to [25349023](https://github.com/25349023).
+- Any unmodified code from [nthu-ccxp-captcha](https://github.com/25349023/nthu-ccxp-captcha) remains attributed to [25349023](https://github.com/25349023).
 - Modifications and rewritten portions are additionally copyright (c) 2026 Hsi.
