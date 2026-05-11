@@ -9,9 +9,9 @@ from PIL import Image
 from bs4 import BeautifulSoup
 
 try:
-    from .paths import resolve_repo_path
+    from .paths import PIPELINE
 except ImportError:
-    from paths import resolve_repo_path
+    from paths import PIPELINE
 
 BASE_URL = 'https://www.ccxp.nthu.edu.tw/ccxp/INQUIRE/'
 
@@ -112,8 +112,8 @@ def collect_many(save_dir: Path, n_round: int, cnt_per_round: int):
 
 
 if __name__ == '__main__':
-    dire = resolve_repo_path('data')
+    dire = PIPELINE.default_raw_dir()
     if not dire.exists():
         dire.mkdir(parents=True)
 
-    collect_many(dire, 50, 50)
+    collect_many(dire, PIPELINE.collect_count, PIPELINE.variants_per_label)

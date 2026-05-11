@@ -6,9 +6,9 @@ import numpy as np
 from PIL import Image
 
 try:
-    from .paths import resolve_repo_path
+    from .paths import PIPELINE, resolve_repo_path
 except ImportError:
-    from paths import resolve_repo_path
+    from paths import PIPELINE, resolve_repo_path
 
 def parse_metadata(path: pathlib.Path) -> Tuple[str, str]:
     stem = path.stem
@@ -66,8 +66,8 @@ def build_arrays(src: pathlib.Path, out_dir: pathlib.Path):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--src', default='data/oauth')
-    parser.add_argument('--out', default='data/oauth')
+    parser.add_argument('--src', default=str(PIPELINE.default_raw_dir()))
+    parser.add_argument('--out', default=str(PIPELINE.default_processed_dir()))
     args = parser.parse_args()
     args.src = str(resolve_repo_path(args.src))
     args.out = str(resolve_repo_path(args.out))

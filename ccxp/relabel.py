@@ -6,9 +6,9 @@ from typing import Iterable, List, Tuple
 from PIL import Image
 
 try:
-    from .paths import resolve_repo_path
+    from .paths import PIPELINE, resolve_repo_path
 except ImportError:
-    from paths import resolve_repo_path
+    from paths import PIPELINE, resolve_repo_path
 
 
 def render_image_in_terminal(content: bytes):
@@ -124,7 +124,7 @@ def main():
         help='Group id, or the new label when targeting the latest group.',
     )
     parser.add_argument('new_label', nargs='?', help='Correct 6-digit label to write into filenames.')
-    parser.add_argument('--raw-dir', default='data', help='Directory containing the collected PNG files.')
+    parser.add_argument('--raw-dir', default=str(PIPELINE.default_raw_dir()), help='Directory containing the collected PNG files.')
     parser.add_argument(
         '--latest',
         '--edit-latest',

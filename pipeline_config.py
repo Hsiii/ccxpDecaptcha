@@ -22,6 +22,30 @@ class PipelinePaths:
     checkpoints_dir: Path
     eval_dir: Path
 
+    @property
+    def image_array_path(self) -> Path:
+        return self.processed_dir / 'images.npy'
+
+    @property
+    def label_array_path(self) -> Path:
+        return self.processed_dir / 'labels.npy'
+
+    @property
+    def group_array_path(self) -> Path:
+        return self.processed_dir / 'groups.npy'
+
+    @property
+    def best_checkpoint_path(self) -> Path:
+        return self.checkpoints_dir / 'best.pt'
+
+    @property
+    def last_checkpoint_path(self) -> Path:
+        return self.checkpoints_dir / 'last.pt'
+
+    @property
+    def quantized_checkpoint_path(self) -> Path:
+        return self.checkpoints_dir / 'int8.pt'
+
 
 @dataclass(frozen=True)
 class PipelineConfig:
@@ -32,6 +56,15 @@ class PipelineConfig:
     variants_per_label: int
     train_epochs: int
     crop_right: int = 0
+
+    def default_raw_dir(self) -> Path:
+        return self.paths.raw_dir
+
+    def default_processed_dir(self) -> Path:
+        return self.paths.processed_dir
+
+    def default_resume_path(self) -> Path:
+        return self.paths.last_checkpoint_path
 
 
 def build_pipeline_config(

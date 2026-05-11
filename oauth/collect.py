@@ -10,9 +10,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 try:
-    from .paths import resolve_repo_path
+    from .paths import PIPELINE, resolve_repo_path
 except ImportError:
-    from paths import resolve_repo_path
+    from paths import PIPELINE, resolve_repo_path
 
 CHARSET = '0123456789'
 IMAGE_WIDTH = 150
@@ -144,9 +144,9 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description='Generate local 150x80 OAuth captcha images using persistent Securimage PHP workers.'
     )
-    parser.add_argument('--out', default='data/oauth', help='Directory to write generated PNG files.')
-    parser.add_argument('--groups', type=int, default=1000, help='Number of unique captcha codes to generate.')
-    parser.add_argument('--renders-per-group', type=int, default=10, help='Number of rendered variants per code.')
+    parser.add_argument('--out', default=str(PIPELINE.default_raw_dir()), help='Directory to write generated PNG files.')
+    parser.add_argument('--groups', type=int, default=PIPELINE.collect_count, help='Number of unique captcha codes to generate.')
+    parser.add_argument('--renders-per-group', type=int, default=PIPELINE.variants_per_label, help='Number of rendered variants per code.')
     parser.add_argument('--seed', type=int, default=None, help='Optional random seed for reproducible generation.')
     parser.add_argument(
         '--workers',

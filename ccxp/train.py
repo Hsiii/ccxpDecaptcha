@@ -3,7 +3,6 @@ import csv
 import json
 import os
 import random
-import shutil
 import time
 import warnings
 from collections import Counter, defaultdict
@@ -20,10 +19,12 @@ from torch.utils import data
 
 try:
     from .net import DIGITS, Net
-    from .paths import resolve_repo_path
+    from .paths import PIPELINE, resolve_repo_path
 except ImportError:
     from net import DIGITS, Net
-    from paths import resolve_repo_path
+    from paths import PIPELINE, resolve_repo_path
+
+from pipeline_artifacts import build_training_output_paths, prepare_training_output_dir
 
 DEFAULT_SEED = None
 MAX_TRAIN_RENDERS_PER_GROUP = 20
@@ -362,11 +363,11 @@ def export_quantized_model(model: nn.Module, output_path: str):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--resume', default='out/last.pt')
-    parser.add_argument('--epochs', type=int, default=30)
+    parser.add_argument('--resume', default=str(PIPELINE.default_resume_path()))
+    parser.add_argument('--epochs', type=int, default=PIPELINE.train_epochs)
     parser.add_argument('--seed', type=int, default=DEFAULT_SEED)
-    parser.add_argument('--data', default='data')
-    parser.add_argument('--out', default='out')
+    parser.add_argument('--data', default=str(PIPELINE.default_processed_dir()))
+    parser.add_argument('--out', default=str(PIPELINE.paths.out_dir))
     parser.add_argument('--overwrite', action='store_true', default=True)
     parser.add_argument('--no-overwrite', dest='overwrite', action='store_false')
     args = parser.parse_args()
@@ -428,42 +429,6 @@ def should_replace_best_checkpoint(
     )
 
 
-def build_output_paths(output_dir: Path) -> Dict[str, Path]:
-    return {
-        'last_checkpoint': output_dir / 'last.pt',
-        'best_checkpoint': output_dir / 'best.pt',
-        'quantized_checkpoint': output_dir / 'int8.pt',
-        'val_failures': output_dir / 'val.csv',
-        'test_failures': output_dir / 'test.csv',
-        'val_confusion': output_dir / 'val_cm.npy',
-        'test_confusion': output_dir / 'test_cm.npy',
-        'metrics_summary': output_dir / 'metrics.json',
-    }
-
-
-def prepare_output_dir(output_dir: Path, overwrite_output: bool, preserve_paths: Optional[List[Path]] = None):
-    paths = build_output_paths(output_dir)
-    preserved = {path.resolve() for path in (preserve_paths or []) if path.exists()}
-    existing = [path for path in paths.values() if path.exists()]
-    if existing and not overwrite_output:
-        joined = ', '.join(str(path) for path in existing)
-        raise FileExistsError(
-            f'Refusing to overwrite existing training artifacts in {output_dir}: {joined}. '
-            'Pass --overwrite to replace them or choose a new --out.'
-        )
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    if overwrite_output:
-        for path in existing:
-            if path.resolve() in preserved:
-                continue
-            if path.is_dir():
-                shutil.rmtree(path)
-            else:
-                path.unlink()
-    return paths
-
-
 if __name__ == '__main__':
     args = parse_args()
     seed_everything(args.seed)
@@ -490,14 +455,15 @@ if __name__ == '__main__':
     maybe_resume(model, args.resume)
 
     output_dir = Path(args.out)
-    existing_best_checkpoint = load_existing_checkpoint(build_output_paths(output_dir)['best_checkpoint'])
-    output_paths = prepare_output_dir(
+    current_output_paths = build_training_output_paths(output_dir)
+    existing_best_checkpoint = load_existing_checkpoint(current_output_paths['best_checkpoint'])
+    output_paths = prepare_training_output_dir(
         output_dir,
         overwrite_output=args.overwrite,
         preserve_paths=[
             Path(args.resume),
-            build_output_paths(output_dir)['best_checkpoint'],
-            build_output_paths(output_dir)['quantized_checkpoint'],
+            current_output_paths['best_checkpoint'],
+            current_output_paths['quantized_checkpoint'],
         ],
     )
 
